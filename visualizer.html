@@ -1,0 +1,445 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<title>Samurai Visualizer</title>
+
+<script>
+var gamedata = {};
+var ctx;
+var field, fieldb, actionfield;
+var fwidth = 15;
+var fheight = 15;
+var ssize = 40;
+var csize = ssize * fwidth;
+
+var color = [ "#ff0000", "#ff3333", "#ff6666", "#0000ff", "#3333ff", "#6666ff", "#eeeeee" ];
+var pbx = [ 0, 0, 7, 14, 14, 7 ];
+var pby = [ 0, 7, 0, 14, 7, 14 ];
+var px = [];
+var py = [];
+var phidden = [];
+var pcure = [];
+var poccupy = [];
+var pmoved = [];
+var turn;
+var typename = [ "槍", "刀", "鉞" ];
+var actiontext = [ "", "南占領", "東占領", "北占領", "西占領", "南", "東", "北", "西", "隠伏", "顕現" ];
+var actionmsg = "";
+var actionplayernum;
+var turnrb, turnslider, sikaiallrb, sikairedrb, sikaibluerb;
+
+var attackx = [ [	[  0,  0,  0,  0 ], [  0,  0,  1,  1,  2 ], [ -1, -1, -1,  0,  1,  1,  1 ] ],
+								[	[  1,  2,  3,  4 ], [  1,  2,  0,  1,  0 ], [ -1,  0,  1,  1, -1,  0,  1 ] ],
+								[	[  0,  0,  0,  0 ], [  0,  0, -1, -1, -2 ], [  1,  1,  1,  0, -1, -1, -1 ] ],
+								[	[ -1, -2, -3, -4 ], [ -1, -2,  0, -1,  0 ], [  1,  0, -1, -1,  1,  0, -1 ] ] ];
+var attacky = [ [ [  1,  2,  3,  4 ], [  1,  2,  0,  1,  0 ], [ -1,  0,  1,  1, -1,  0,  1 ] ],
+								[	[  0,  0,  0,  0 ], [  0,  0, -1, -1, -2 ], [  1,  1,  1,  0, -1, -1, -1 ] ],
+								[	[ -1, -2, -3, -4 ], [ -1, -2,  0, -1,  0 ], [  1,  0, -1, -1,  1,  0, -1 ] ],
+								[	[  0,  0,  0,  0 ], [  0,  0,  1,  1,  2 ], [ -1, -1, -1,  0,  1,  1,  1 ] ] ];
+
+function handleFileSelect(evt) {
+	evt.stopPropagation();
+	evt.preventDefault();
+
+	var files = evt.dataTransfer.files; 
+
+	var output = [];
+	for (var i = 0; i < files.length; i++) {
+
+		var reader = new FileReader();
+		reader.onload = (function(f) {
+			gamedata = JSON.parse(f.target.result);
+			initgame();
+			draw();
+		});
+		reader.readAsText(files[i]);
+	}
+}
+
+function handleDragOver(evt) {
+	evt.stopPropagation();
+	evt.preventDefault();
+	evt.dataTransfer.dropEffect = 'copy';
+}
+
+function PageLoad(evt) {
+	var canvas = document.getElementById('canvas');
+	canvas.addEventListener('dragover', handleDragOver, false);
+	canvas.addEventListener('drop', handleFileSelect, false);
+	ctx = canvas.getContext('2d');
+	turntb = document.getElementById('turn');
+	turnslider = document.getElementById('slider');
+	sikaiallrb = document.getElementById('sikaiall');
+	sikairedrb = document.getElementById('sikaired');
+	sikaibluerb = document.getElementById('sikaiblue');
+
+	field = [];
+	fieldb = [];
+	actionfield = [];
+	for (var x = 0 ; x < fwidth ; x++) {
+		field[x] = [];
+		fieldb[x] = [];
+		actionfield[x] = [];
+	}
+	initgame();
+	draw();
+}
+
+function initgame() {
+	for (var x = 0 ; x < fwidth ; x++) {
+		for (var y = 0 ; y < fheight ; y++) {
+			field[x][y] = 6;
+			fieldb[x][y] = 0;
+			actionfield[x][y] = 0;
+		}
+	}
+	for (var i = 0 ; i < 6 ; i++) {
+		field[pbx[i]][pby[i]] = i;
+		fieldb[pbx[i]][pby[i]] = 1;
+		px[i] = pbx[i];
+		py[i] = pby[i];
+		phidden[i] = 0;
+		pcure[i] = 0;
+		poccupy[i] = 1;
+		pmoved[i] = 0;
+	}
+	poccupy[6] = 0;
+	turn = 0;
+	actionmsg = "";
+	actionplayernum = -1;
+}
+
+function draw() {
+	if (gamedata['title'] === undefined) {
+		actionmsg = "データがありません。ファイルを上のキャンバスにドラッグアンドドロップしてください。";
+	}
+	ctx.clearRect(0, 0, 900, 750);
+	ctx.lineWidth = 1;
+	ctx.strokeStyle = "black";
+	ctx.beginPath();
+	ctx.rect(0, 0, csize, csize);
+	ctx.stroke();
+	for (var i = 0 ; i < 7 ; i++) {
+		poccupy[i] = 0;
+	}
+	for (var x = 0 ; x < fwidth ; x++) {
+		for (var y = 0 ; y < fheight ; y++) {
+			ctx.beginPath();
+			ctx.rect(ssize * x, ssize * y, ssize, ssize);
+			ctx.fillStyle = color[field[x][y]];
+			ctx.strokeStyle = "black";
+			ctx.fill();
+			ctx.stroke();
+			poccupy[field[x][y]]++;
+			if (actionfield[x][y] == 1) {
+				ctx.strokeStyle = "white";
+				for (var i = 1 ; i <= 3 ; i++) {
+					ctx.beginPath();
+					ctx.rect(ssize * x + i, ssize * y + i, ssize - i * 2, ssize - i * 2);
+					ctx.stroke();
+				}
+			}
+			var plen = 0;
+			for (var i = 0 ; i < 6 ; i++) {
+				if (px[i] == x && py[i] == y) {
+					plen++;
+				}
+			}
+			if (plen > 0) {
+				ctx.beginPath();
+				var fontsize = 16;
+				var paddingx = 3;
+				var paddingy = 3;
+				var left = (ssize - plen * fontsize / 2 - paddingx * 2) / 2;
+				var top = (ssize - fontsize - paddingy * 2) / 2; 
+				ctx.rect(ssize * x + left, ssize * y + top, plen * fontsize / 2 + paddingx * 2 + 1 , fontsize + paddingy * 2);
+				ctx.strokeWidth = 1;
+				ctx.strokeStyle = "black";
+				ctx.fillStyle = "white";
+				ctx.fill();
+				ctx.stroke();
+				left += paddingx + 1;
+				top += paddingy + fontsize - 1;
+				ctx.fillStyle = "black";
+				for (var i = 0 ; i < 6 ; i++) {
+					if (px[i] == x && py[i] == y) {
+						if (actionplayernum == i) {
+							ctx.strokeStyle = "#33ff33";
+							for (var j = 1 ; j <= 6 ; j++) {
+								ctx.beginPath();
+								ctx.rect(ssize * x + j, ssize * y + j, ssize - j * 2, ssize - j * 2);
+								ctx.stroke();
+							}
+							ctx.font = "bold " + fontsize + "px sans-serif";
+						}
+						else {
+							ctx.font = fontsize + "px sans-serif";
+						}
+						if (phidden[i] == 0) {
+							ctx.fillStyle = "black";
+						}
+						else {
+							ctx.fillStyle = "red";
+						}
+						ctx.fillText(i, ssize * px[i] + left, ssize * py[i] + top);
+						left += fontsize / 2;
+					}
+				}
+			}
+		}
+	}
+	ctx.fillStyle = "black";
+	ctx.font = "20px sans-serif";
+	ctx.fillText("Turn " + turn + "   " + (poccupy[0] + poccupy[1] + poccupy[2]) + " VS " + (poccupy[3] + poccupy[4] + poccupy[5]) + "   left " + poccupy[6], 0, csize + 24);
+
+	if (turn > 0) {
+		if (turn % 2 == 1) {
+			ctx.fillStyle = "red";
+		}
+		else {
+			ctx.fillStyle = "blue";
+		}
+		ctx.fillText("●", 0, csize + 48);
+	}
+	ctx.fillStyle = "black";
+	ctx.fillText(actionmsg, 22, csize + 48);
+
+	var tx = 0;
+	var lx = 0;
+	for (var i = 0 ; i < 7 ; i++) {
+		ctx.beginPath();
+		ctx.fillStyle = color[i];
+		ctx.rect(lx, csize + 55, poccupy[i] * 2, 25);
+		lx += poccupy[i] * 2;
+		ctx.fill();
+		if (i == 6) {
+			ctx.fillStyle = "black";
+		}
+		ctx.fillText(poccupy[i], tx, csize + 105);
+		tx += 20 + ((poccupy[i] >= 100) ? 20 : ((poccupy[i] >= 10) ? 10 : 0));
+		if (tx < lx) {
+			tx = lx;
+		}
+		if (i != 6) {
+			ctx.strokeStyle = "black";
+			ctx.lineWidth = 1;
+			ctx.beginPath();
+			ctx.rect(pbx[i] * ssize + 1, pby[i] * ssize + 1, ssize - 2, ssize - 2);
+			ctx.stroke();
+			ctx.beginPath();
+			ctx.rect(pbx[i] * ssize + 2, pby[i] * ssize + 2, ssize - 4, ssize - 4);
+			ctx.stroke();
+			if (i == actionplayernum) {
+				ctx.fillStyle = "red";
+			}
+			else {
+				ctx.fillStyle = "black";
+			}
+			ctx.fillText("P" + i + ((pmoved[i] == 0) ? " 　" : " 済") + " (" + px[i] + "," + py[i] + ") " + ((phidden[i] == 1) ? "隠 " : " ") + ((pcure[i] > 0) ? "治" + pcure[i] : ""), csize + 10, 20 + i * 25);
+		}
+	}
+	if (!sikaiallrb.checked) {
+		var start = sikairedrb.checked ? 0 : 3;
+		for (var x = 0 ; x < fwidth ; x++) {
+			for (var y = 0 ; y < fheight ; y++) {
+				var isvisible = false;
+				for (var i = start ; i < start + 3 ; i++) {
+					if ((x == pbx[i] && y == pby[i]) || Math.abs(px[i] - x) + Math.abs(py[i] - y) <= 5) {
+						isvisible = true;
+					}
+				}
+				if (isvisible == false) {
+					ctx.beginPath();
+					ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+					ctx.rect(ssize * x, ssize * y, ssize, ssize);
+					ctx.fill();
+				}
+			}
+		}
+	}
+
+	turntb.value = turn;
+	turnslider.value = turn;
+}
+
+function doaction(drawflag) {
+	if (turn >= 96) {
+		turn = 96;
+		return;
+	}
+	if (gamedata['title'] === undefined) {
+		actionmsg = "データがありません。ファイルを上のキャンバスにドラッグアンドドロップしてください。";
+		draw();
+		return;
+	}
+	for (var x = 0 ; x < fwidth ; x++) {
+		for (var y = 0 ; y < fheight ; y++) {
+			actionfield[x][y] = 0;
+		}
+	}
+	if (turn % 6 == 0) {
+		for (var i = 0 ; i < 6 ; i++) {
+			pmoved[i] = 0;
+		}
+	}
+	var turndata = gamedata['plays'][turn];
+	var stype = turndata['samurai'];
+	var snum = stype + (turn % 2) * 3;
+	var allynum = (turn % 2) * 3;
+	var enenum = 3 - allynum;
+	actionmsg = snum + "(" + typename[stype] + ")の行動 " + turndata['responseTime'] + "ms  ";
+	for (var i = 0 ; i < 6 ; i++) {
+		if (pcure[i] > 0) {
+			pcure[i]--;
+		}
+	}
+	if (snum < 0 || turndata['actions'].length == 0) {
+		actionmsg = "パス(治療中 or 未行動)";
+		actionplayernum = -1;
+		turn++;
+		draw();
+		return;
+	}
+	actionplayernum = snum;
+  // エラーに関係なく行動は出力する
+  actionmsg += "「 " + ((actionplayernum > 3) ? actionplayernum - 3 : actionplayernum) + " ";
+	for (var i = 0 ; i < turndata['actions'].length ; i++) {
+    actionmsg += turndata['actions'][i] + " ";
+  }
+  actionmsg += "」 ";
+	for (var i = 0 ; i < turndata['actions'].length ; i++) {
+		var action = turndata['actions'][i];
+		if (action >= 1 && action <= 4) {
+			actionmsg += actiontext[action] + "  ";
+			if (phidden[snum] == 1) {
+				actionmsg += "エラー  ";
+				break;
+			}
+			for (var j = 0 ; j < attackx[action - 1][stype].length ; j++) {
+				var x = px[snum] + attackx[action - 1][stype][j];
+				var y = py[snum] + attacky[action - 1][stype][j];
+				if (x >= 0 && x < fwidth && y >= 0 && y < fheight && fieldb[x][y] == 0) {
+					poccupy[field[x][y]]--;
+					poccupy[snum]++;
+					field[x][y] = snum;
+					actionfield[x][y] = 1;
+					for (var k = enenum ; k < enenum + 3 ; k++) {
+						if (x == px[k] && y == py[k]) {
+							pcure[k] = 17;
+							px[k] = pbx[k];
+							py[k] = pby[k];
+							phidden[k] = 0;
+							actionmsg += "P" + k + "撃破  ";
+						}
+					}
+				}
+			}
+		}
+		else if (action >= 5 && action <= 8) {
+			actionmsg += actiontext[action] + "  ";
+			var x = px[snum] + attackx[action - 5][0][0];
+			var y = py[snum] + attacky[action - 5][0][0];
+			if (x >= 0 && x < fwidth && y >= 0 && y < fheight && (fieldb[x][y] == 0 || (x == pbx[snum] && y == pby[snum]))) {
+				if (phidden[snum] == 1 && !(field[x][y] >= allynum && field[x][y] < allynum + 3)) {
+					actionmsg += "エラー  ";
+					break;
+				}
+				else {
+					var error = false;
+					for (var j = 0 ; j < 6; j++) {
+						if (j == snum) {
+							continue;
+						}
+						if (x == px[j] && y == py[j] && phidden[j] == 0) {
+							error = true;
+							break;
+						}
+					}
+					if (error) {
+							actionmsg += "エラー  ";
+							break;
+					}
+					else {
+						px[snum] = x;
+						py[snum] = y;
+					}
+				}
+			}
+			else {
+				actionmsg += "エラー  ";
+				break;
+			}
+		}
+		else if (action == 9) {
+			if (phidden[snum] == 0) {
+				actionmsg += actiontext[action] + "  ";
+				if (field[px[snum]][py[snum]] >= allynum && field[px[snum]][py[snum]] < allynum + 3){
+					phidden[snum] = 1;
+				}
+				else {
+					actionmsg += "エラー  ";
+					break;
+				}
+			}
+			else {
+				actionmsg += actiontext[action + 1] + "  ";
+				phidden[snum] = 0;
+			}
+		}
+		else {
+			actionmsg += "不明  ";
+		}
+	}
+	pmoved[snum] = 1;
+	for (var i = 0 ; i < 6 ; i++) {
+		if (poccupy[i] != gamedata['plays'][turn]['territories'][i]) {
+			actionmsg += "占領数エラー  "
+			for (var j = 0 ; j < 6 ; j++) {
+				actionmsg += gamedata['plays'][turn]['territories'][j] + " ";
+			}
+			break;
+		}
+	}
+	turn++;
+	if (drawflag) {
+		draw();
+	}
+}
+
+function goturn(t) {
+	if (t < 0) {
+		t = 0;
+	}
+	if (t >= 96) {
+		t = 96;
+	}
+	initgame();
+	for (var i = 0 ; i < t ; i++) {
+		doaction(false);
+	}
+	draw();
+}
+
+function changeturntb() {
+	goturn(turntb.value);
+}
+
+function changeturnslider() {
+	goturn(turnslider.value);
+}
+
+</script>
+
+</head>
+<body id="body" onload="PageLoad();">
+	<canvas id="canvas" width="900" height="710"></canvas><br>
+	<input type="button" value="最初へ" onClick="goturn(0);">
+	<input type="button" value="前のターン" onClick="goturn(turn - 1);">
+	<input type="button" value="次のターン" onClick="doaction(true);">
+	<input type="button" value="最後へ" onClick="goturn(96);">
+	Turn <input value="0" id="turn" size="2" onChange="changeturntb();"> <input type="range" value="0" min="0" max="96" step="1" width="196" id="slider" onChange="changeturnslider();">
+	視界：<input type="radio" id="sikaiall" name="sikai" value="all" checked onChange="draw();">全<input type="radio" id="sikaired" name="sikai" value="red" onChange="draw();">赤<input type="radio" id="sikaiblue" name="sikai" value="blue" onChange="draw();">青
+
+</body>
+</html>
