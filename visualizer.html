@@ -3,7 +3,11 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 <title>Samurai Visualizer</title>
-
+<style>
+body {
+	line-height: 1.2;
+}
+</style>
 <script>
 var gamedata = {};
 var ctx;
@@ -50,7 +54,14 @@ function handleFileSelect(evt) {
 		var reader = new FileReader();
 		reader.onload = (function(f) {
 			gamedata = JSON.parse(f.target.result);
+			if (gamedata['plays'] === undefined && gamedata.length == 96) {
+				gamedata['plays'] = gamedata;
+				gamedata['title'] = "";
+				gamedata['playerNames'] = [ "pl1", "pl2" ];
+			}
 			initgame();
+			calcinput();
+			goturn(0);
 			draw();
 		});
 		reader.readAsText(files[i]);
@@ -82,6 +93,9 @@ function PageLoad(evt) {
 		fieldb[x] = [];
 		actionfield[x] = [];
 	}
+	document.getElementById("pl0").value = "";
+	document.getElementById("pl1").value = "";
+	input = [];
 	initgame();
 	draw();
 }
@@ -205,6 +219,12 @@ function draw() {
 	ctx.fillStyle = "black";
 	ctx.fillText(actionmsg, 22, csize + 48);
 
+	if (gamedata["playerNames"] !== undefined) {
+		ctx.fillStyle = "black";
+		ctx.fillText(gamedata["playerNames"][0], csize + 10, 20);
+		ctx.fillText(gamedata["playerNames"][1], csize + 10, 120);
+	}
+
 	var tx = 0;
 	var lx = 0;
 	for (var i = 0 ; i < 7 ; i++) {
@@ -236,7 +256,7 @@ function draw() {
 			else {
 				ctx.fillStyle = "black";
 			}
-			ctx.fillText("P" + i + ((pmoved[i] == 0) ? " 　" : " 済") + " (" + px[i] + "," + py[i] + ") " + ((phidden[i] == 1) ? "隠 " : " ") + ((pcure[i] > 0) ? "治" + pcure[i] : ""), csize + 10, 20 + i * 25);
+			ctx.fillText("P" + i + ((pmoved[i] == 0) ? " 　" : " 済") + " (" + px[i] + "," + py[i] + ") " + ((phidden[i] == 1) ? "隠 " : " ") + ((pcure[i] > 0) ? "治" + pcure[i] : ""), csize + 10, 45 + i * 25 + ((i >= 3) ? 25 : 0));
 		}
 	}
 	if (!sikaiallrb.checked) {
@@ -278,11 +298,7 @@ function doaction(drawflag) {
 			actionfield[x][y] = 0;
 		}
 	}
-	if (turn % 6 == 0) {
-		for (var i = 0 ; i < 6 ; i++) {
-			pmoved[i] = 0;
-		}
-	}
+
 	var turndata = gamedata['plays'][turn];
 	var stype = turndata['samurai'];
 	var snum = stype + (turn % 2) * 3;
@@ -302,12 +318,12 @@ function doaction(drawflag) {
 		return;
 	}
 	actionplayernum = snum;
-  // エラーに関係なく行動は出力する
-  actionmsg += "「 " + ((actionplayernum > 3) ? actionplayernum - 3 : actionplayernum) + " ";
+	// エラーに関係なく行動は出力する
+	actionmsg += "「 " + ((actionplayernum > 3) ? actionplayernum - 3 : actionplayernum) + " ";
 	for (var i = 0 ; i < turndata['actions'].length ; i++) {
-    actionmsg += turndata['actions'][i] + " ";
-  }
-  actionmsg += "」 ";
+		actionmsg += turndata['actions'][i] + " ";
+	}
+	actionmsg += "」 ";
 	for (var i = 0 ; i < turndata['actions'].length ; i++) {
 		var action = turndata['actions'][i];
 		if (action >= 1 && action <= 4) {
@@ -402,6 +418,11 @@ function doaction(drawflag) {
 		}
 	}
 	turn++;
+	if (turn % 6 == 0) {
+		for (var i = 0 ; i < 6 ; i++) {
+			pmoved[i] = 0;
+		}
+	}
 	if (drawflag) {
 		draw();
 	}
@@ -429,6 +450,121 @@ function changeturnslider() {
 	goturn(turnslider.value);
 }
 
+function loadreplay() {
+	var data = document.getElementById("data").value;
+	if (data.indexOf("対戦ログ") == -1) {
+		alert("リプレイのデータではありません");
+	}
+	else {
+		var result = data.match(/AI 0: (.*)\s*AI/);
+		if (result === null) {
+			alert("リプレイのデータではありません");
+			return;
+		}
+		var ai0 = result[1];
+		result = data.match(/AI 1: (.*)\s*対戦/);
+		if (result === null) {
+			alert("リプレイのデータではありません");
+			return;
+		}
+		var ai1 = result[1];
+		result = data.match(/対戦ログ\s*(\[\S+\])/);
+		if (result === null) {
+			alert("リプレイのデータではありません");
+			return;
+		}
+		var plays = JSON.parse(result[1]);
+		if (plays === null) {
+			alert("リプレイのデータではありません");
+			return;
+		}
+		gamedata = {
+			"title":				"",
+			"playerNames":	[	ai0, ai1 ],
+			"plays":				plays
+		};
+		initgame();
+		calcinput();
+		goturn(0);
+		draw();
+	}
+}
+
+function calcinput() {
+	input = [ "0\n", "1\n" ];
+	initgame();
+	for (var turn = 0 ; turn < 96 ; turn++) {
+		goturn(turn);
+		var pl = turn % 2;
+		input[pl] += turn + "\n";
+		for (var i = 0 ; i < 3 ; i++) {
+			var p = pl * 3 + i;
+			input[pl] += px[p] + " " + py[p] + " " + pmoved[p] + " " + phidden[p] + " " + pcure[p] + "\n";
+		}
+		for (var i = 0 ; i < 3 ; i++) {
+			var p = (1 - pl) * 3 + i;
+			var isinsight = false;
+			if (phidden[p] == 0) {
+				for (var j = 0 ; j < 3 ; j++) {
+					var p2 = pl * 3 + j;
+					if (Math.abs(px[p] - px[p2]) + Math.abs(py[p] - py[p2]) <= 5) {
+						isinsight = true;
+						break;
+					}
+				}
+			}
+			if (isinsight) {
+				input[pl] += px[p] + " " + py[p] + " " + pmoved[p] + " " + phidden[p] + " " + pcure[p] + "\n";
+			}
+			else {
+				input[pl] += "-1 -1 " + pmoved[p] + " 1 " + pcure[p] + "\n";
+			}
+		}
+		for (var y = 0 ; y < fheight ; y++) {
+			for (var x = 0 ; x < fwidth ; x++) {
+				var isvisible = false;
+				for (var i = pl * 3 ; i < pl * 3 + 3 ; i++) {
+					if (Math.abs(px[i] - x) + Math.abs(py[i] - y) <= 5) {
+						isvisible = true;
+					}
+				}
+				for (var i = 0 ; i < 6 ; i++) {
+					if (x == pbx[i] && y == pby[i]) {
+						isvisible = true;
+					}
+				}
+				if (isvisible) {
+					input[pl] += " " + ((field[x][y] != 6) ? (field[x][y] + pl * 3) % 6 : "8");
+				}
+				else {
+					input[pl] += " 9";
+				}
+			}
+			input[pl] += "\n";
+		}
+		document.getElementById("pl0").value = input[0];
+		document.getElementById("pl1").value = input[1];
+	}
+}
+
+function saveinput(pl) {
+	if (input.length == 0) {
+		alert("リプレイデータが読み込まれていません。空のファイルを出力します。");
+	}
+	var blob = new Blob([document.getElementById("pl" + pl).value], {type: "text/plain"});
+	var a = document.getElementById("dl"+ pl);
+	a.href = URL.createObjectURL(blob);
+}
+
+function test() {
+	if (input.length == 0) {
+		alert("リプレイデータが読み込まれていません");
+		return false;
+	}
+	var blob = new Blob([input[0]], {type: "text/plain"});
+	var a = document.getElementById("pl3");
+	a.href = URL.createObjectURL(blob);
+}
 </script>
 
 </head>
@@ -439,7 +575,12 @@ function changeturnslider() {
 	<input type="button" value="次のターン" onClick="doaction(true);">
 	<input type="button" value="最後へ" onClick="goturn(96);">
 	Turn <input value="0" id="turn" size="2" onChange="changeturntb();"> <input type="range" value="0" min="0" max="96" step="1" width="196" id="slider" onChange="changeturnslider();">
-	視界：<input type="radio" id="sikaiall" name="sikai" value="all" checked onChange="draw();">全<input type="radio" id="sikaired" name="sikai" value="red" onChange="draw();">赤<input type="radio" id="sikaiblue" name="sikai" value="blue" onChange="draw();">青
-
+	視界：<input type="radio" id="sikaiall" name="sikai" value="all" checked onChange="draw();">全<input type="radio" id="sikaired" name="sikai" value="red" onChange="draw();">赤<input type="radio" id="sikaiblue" name="sikai" value="blue" onChange="draw();">青<br>
+	<hr>
+	本家のリプレイのページ上でページ上のデータを全選択してコピーし、下記のテキストボックスにで貼り付けることでリプレイを読み込むことができます。<br>
+	<input id="data" size="50"><input type="button" value="リプレイ読み込み" onClick="loadreplay();">
+	<hr>
+	プレーヤー１の出力: <textarea id="pl0" size=50"></textarea> <a download="pl1.txt" href="" onClick="saveinput(0);" id="dl0">ファイルに保存</a><br>
+	プレーヤー２の出力: <textarea id="pl1" size=50"></textarea> <a download="pl2.txt" href="" onClick="saveinput(1);" id="dl1">ファイルに保存</a>
 </body>
 </html>
