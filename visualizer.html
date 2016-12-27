@@ -555,16 +555,6 @@ function saveinput(pl) {
 	var a = document.getElementById("dl"+ pl);
 	a.href = URL.createObjectURL(blob);
 }
-
-function test() {
-	if (input.length == 0) {
-		alert("リプレイデータが読み込まれていません");
-		return false;
-	}
-	var blob = new Blob([input[0]], {type: "text/plain"});
-	var a = document.getElementById("pl3");
-	a.href = URL.createObjectURL(blob);
-}
 </script>
 
 </head>
