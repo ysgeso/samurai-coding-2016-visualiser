@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-<title>Samurai Visualizer</title>
+<title>Samurai Visualizer ver 3.0</title>
 <style>
 body {
 	line-height: 1.2;
@@ -93,6 +93,7 @@ function PageLoad(evt) {
 		fieldb[x] = [];
 		actionfield[x] = [];
 	}
+	mx = my = 0;
 	document.getElementById("pl0").value = "";
 	document.getElementById("pl1").value = "";
 	input = [];
@@ -225,6 +226,12 @@ function draw() {
 		ctx.fillText(gamedata["playerNames"][1], csize + 10, 120);
 	}
 
+	if (mx >= 0 && mx < fwidth && my >= 0 && my < fheight) {
+		ctx.fillStyle = "black";
+		ctx.font = "20px sans-serif";
+		ctx.fillText("マウスの位置 (" + mx + ", " + my + ")", csize + 10, 250);
+	}
+
 	var tx = 0;
 	var lx = 0;
 	for (var i = 0 ; i < 7 ; i++) {
@@ -311,11 +318,18 @@ function doaction(drawflag) {
 		}
 	}
 	if (snum < 0 || turndata['actions'].length == 0) {
-		actionmsg = "パス(治療中 or 未行動)";
-		actionplayernum = -1;
-		turn++;
-		draw();
-		return;
+		if (snum < 0 || pcure[snum] > 0) {
+			actionmsg = "パス(治療中 or 不正な行動)";
+			actionplayernum = -1;
+			turn++;
+			if (turn % 6 == 0) {
+				for (var i = 0 ; i < 6 ; i++) {
+					pmoved[i] = 0;
+				}
+			}
+			draw();
+			return;
+		}
 	}
 	actionplayernum = snum;
 	// エラーに関係なく行動は出力する
@@ -323,7 +337,7 @@ function doaction(drawflag) {
 	for (var i = 0 ; i < turndata['actions'].length ; i++) {
 		actionmsg += turndata['actions'][i] + " ";
 	}
-	actionmsg += "」 ";
+	actionmsg += "0 」 ";
 	for (var i = 0 ; i < turndata['actions'].length ; i++) {
 		var action = turndata['actions'][i];
 		if (action >= 1 && action <= 4) {
@@ -555,11 +569,19 @@ function saveinput(pl) {
 	var a = document.getElementById("dl"+ pl);
 	a.href = URL.createObjectURL(blob);
 }
+
+function mousemove(evt) {
+	mx = Math.floor((evt.clientX - canvas.getBoundingClientRect().left) / ssize);
+	my = Math.floor((evt.clientY - canvas.getBoundingClientRect().top) / ssize);
+	draw();
+}
+
 </script>
 
 </head>
 <body id="body" onload="PageLoad();">
-	<canvas id="canvas" width="900" height="710"></canvas><br>
+	Samurai visualizer ver 3.0 (last update 2016/12/28)<br>
+	<canvas id="canvas" width="900" height="710" onmousemove="mousemove(event)"></canvas><br>
 	<input type="button" value="最初へ" onClick="goturn(0);">
 	<input type="button" value="前のターン" onClick="goturn(turn - 1);">
 	<input type="button" value="次のターン" onClick="doaction(true);">
