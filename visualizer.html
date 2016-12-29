@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-<title>Samurai Visualizer ver 4.0</title>
+<title>Samurai Visualizer ver 4.1</title>
 <style>
 body {
 	line-height: 1.2;
@@ -363,13 +363,13 @@ function draw() {
 			ctx.lineTo(gx + t * hx, gy - hy * occnum[i][t]);
 		}
 		ctx.stroke();
-		ctx.beginPath();
 		for (var t = 0 ; t <= 96 ; t++) {
 			if (kill[t] & (i + 1)) {
+				ctx.beginPath();
 				ctx.arc(gx + t * hx, gy - hy * occnum[i][t], 3, 0, Math.PI * 2, false);
+				ctx.fill();
 			}
 		}
-		ctx.fill();
 	}
 	if (gamedata['title'] !== undefined) {
 		ctx.strokeStyle = "gray";
@@ -744,7 +744,7 @@ function mousewheel(evt) {
 
 </head>
 <body id="body" onload="PageLoad();">
-	Samurai visualizer ver 4.0 (last update 2016/12/29)<br>
+	Samurai visualizer ver 4.1 (last update 2016/12/29)<br>
 	<canvas id="canvas" width="1200" height="710" onmousemove="mousemove(event);" onclick="canvasclick();"></canvas><br>
 	<input type="button" value="最初へ(↑)" onClick="goturn(0);">
 	<input type="button" value="前(←,wheel+)" onClick="goturn(turn - 1);">
