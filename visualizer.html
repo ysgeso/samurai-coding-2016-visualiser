@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-<title>Samurai Visualizer ver 3.0</title>
+<title>Samurai Visualizer ver 4.0</title>
 <style>
 body {
 	line-height: 1.2;
@@ -16,6 +16,11 @@ var fwidth = 15;
 var fheight = 15;
 var ssize = 40;
 var csize = ssize * fwidth;
+// グラフ関連のパラメータ
+var gx = csize + 35;
+var gy = 600;
+var hx = 5;
+var hy = 2;
 
 var color = [ "#ff0000", "#ff3333", "#ff6666", "#0000ff", "#3333ff", "#6666ff", "#eeeeee" ];
 var pbx = [ 0, 0, 7, 14, 14, 7 ];
@@ -26,6 +31,8 @@ var phidden = [];
 var pcure = [];
 var poccupy = [];
 var pmoved = [];
+var	occnum = [ [], [] ];
+var	kill = [];
 var turn;
 var typename = [ "槍", "刀", "鉞" ];
 var actiontext = [ "", "南占領", "東占領", "北占領", "西占領", "南", "東", "北", "西", "隠伏", "顕現" ];
@@ -85,6 +92,9 @@ function PageLoad(evt) {
 	sikairedrb = document.getElementById('sikaired');
 	sikaibluerb = document.getElementById('sikaiblue');
 
+	document.onkeydown = keydown;
+	document.onwheel = mousewheel;
+
 	field = [];
 	fieldb = [];
 	actionfield = [];
@@ -120,6 +130,8 @@ function initgame() {
 		pmoved[i] = 0;
 	}
 	poccupy[6] = 0;
+	kill[0] = 0;
+	occnum[0][0] = occnum[1][0] = 3;
 	turn = 0;
 	actionmsg = "";
 	actionplayernum = -1;
@@ -129,7 +141,7 @@ function draw() {
 	if (gamedata['title'] === undefined) {
 		actionmsg = "データがありません。ファイルを上のキャンバスにドラッグアンドドロップしてください。";
 	}
-	ctx.clearRect(0, 0, 900, 750);
+	ctx.clearRect(0, 0, canvas.width, canvas.height);
 	ctx.lineWidth = 1;
 	ctx.strokeStyle = "black";
 	ctx.beginPath();
@@ -226,10 +238,12 @@ function draw() {
 		ctx.fillText(gamedata["playerNames"][1], csize + 10, 120);
 	}
 
-	if (mx >= 0 && mx < fwidth && my >= 0 && my < fheight) {
+	var bx = Math.floor(mx / ssize);
+	var by = Math.floor(my / ssize);
+	if (bx >= 0 && bx < fwidth && by >= 0 && by < fheight) {
 		ctx.fillStyle = "black";
 		ctx.font = "20px sans-serif";
-		ctx.fillText("マウスの位置 (" + mx + ", " + my + ")", csize + 10, 250);
+		ctx.fillText("マウスの位置 (" + bx + ", " + by + ")", csize + 10, 225);
 	}
 
 	var tx = 0;
@@ -286,6 +300,88 @@ function draw() {
 		}
 	}
 
+	// グラフを書く
+	var t = -1;
+	if (gamedata['title'] !== undefined && mx >= gx && mx <= gx + 96 * hx + 10 && my >= gy - hy * 180 + 10 && my <= gy + 20) {
+			t = Math.floor((mx - gx) / hx);
+			if (t > 96) {
+				t = 96;
+			}
+			ctx.strokeStyle = "limegreen";
+			ctx.lineWidth = 1;
+			ctx.beginPath();
+			ctx.moveTo(gx + t * hx, gy);
+			ctx.lineTo(gx + t * hx, gy - 180 * hy);
+			ctx.stroke();
+			ctx.fillStyle = "black";
+			ctx.font = "16px sans-serif";
+			var txt = "Turn " + t + ": " + occnum[0][t] + " VS " + occnum[1][t];
+			var twidth = ctx.measureText(txt).width;
+			var x = gx + t * hx + 2;
+			if (t * hx + twidth > hx * 96) {
+				x = gx + t * hx - twidth - 2;
+			}
+			ctx.fillText(txt, x, my);
+			ctx.fillText("クリックするとそのターンへ移動します。", gx + 100, gy + 60);
+	}
+	ctx.strokeStyle = "black";
+	ctx.lineWidth = 1;
+	ctx.font = "16px sans-serif";
+	ctx.fillStyle = "black";
+	// 
+	ctx.beginPath();
+	ctx.moveTo(gx, gy);
+	ctx.lineTo(gx + 96 * hx, gy);
+	ctx.stroke();
+	for (var x = 0 ; x <= 96 ; x++) {
+		if (x % 5 == 0) {
+			ctx.moveTo(gx + x * hx, gy);
+			ctx.lineTo(gx + x * hx, gy - 5);
+			ctx.stroke();
+			ctx.fillText(x, gx + x * hx - ((x < 10) ? 3 : 7), gy + 16);
+		}
+	}
+	ctx.beginPath();
+	ctx.moveTo(gx, gy);
+	ctx.lineTo(gx, gy - hy * 180);
+	ctx.stroke();
+	for (var y = 0 ; y <= 180 ; y++) {
+		if (y % 50 == 0) {
+			ctx.moveTo(gx, gy - y * hy);
+			ctx.lineTo(gx + 5, gy - y * hy);
+			ctx.stroke();
+			ctx.fillText(y, gx - 28 + ((y < 10) ? 16 : (y < 100) ? 8 : 0), gy - y * hy + 6);
+		}
+	}
+	for (var i = 0 ; i < 2 ; i++) {
+		ctx.beginPath();
+		ctx.strokeStyle = (i == 0) ? "red" : "blue";
+		ctx.fillStyle = (i == 0) ? "red" : "blue";
+		ctx.lineWidth = 1;
+		ctx.moveTo(gx, gy - hy * occnum[i][0]);
+		for (var t = 0 ; t <= 96 ; t++) {
+			ctx.lineTo(gx + t * hx, gy - hy * occnum[i][t]);
+		}
+		ctx.stroke();
+		ctx.beginPath();
+		for (var t = 0 ; t <= 96 ; t++) {
+			if (kill[t] & (i + 1)) {
+				ctx.arc(gx + t * hx, gy - hy * occnum[i][t], 3, 0, Math.PI * 2, false);
+			}
+		}
+		ctx.fill();
+	}
+	if (gamedata['title'] !== undefined) {
+		ctx.strokeStyle = "gray";
+		ctx.lineWidth = 1;
+		ctx.beginPath();
+		ctx.moveTo(gx + turn * hx, gy);
+		ctx.lineTo(gx + turn * hx, gy - 180 * hy);
+		ctx.stroke();
+		ctx.fillStyle = "black";
+		ctx.fillText("●はそのターンで撃破されたことを表します。", gx + 100, gy + 40);
+	}	
+
 	turntb.value = turn;
 	turnslider.value = turn;
 }
@@ -312,6 +408,7 @@ function doaction(drawflag) {
 	var allynum = (turn % 2) * 3;
 	var enenum = 3 - allynum;
 	actionmsg = snum + "(" + typename[stype] + ")の行動 " + turndata['responseTime'] + "ms  ";
+	kill[turn + 1] = 0;
 	for (var i = 0 ; i < 6 ; i++) {
 		if (pcure[i] > 0) {
 			pcure[i]--;
@@ -321,13 +418,7 @@ function doaction(drawflag) {
 		if (snum < 0 || pcure[snum] > 0) {
 			actionmsg = "パス(治療中 or 不正な行動)";
 			actionplayernum = -1;
-			turn++;
-			if (turn % 6 == 0) {
-				for (var i = 0 ; i < 6 ; i++) {
-					pmoved[i] = 0;
-				}
-			}
-			draw();
+			enddoaction(drawflag);
 			return;
 		}
 	}
@@ -361,6 +452,7 @@ function doaction(drawflag) {
 							py[k] = pby[k];
 							phidden[k] = 0;
 							actionmsg += "P" + k + "撃破  ";
+							kill[turn + 1] |= (enenum == 0) ? 1 : 2;
 						}
 					}
 				}
@@ -431,12 +523,18 @@ function doaction(drawflag) {
 			break;
 		}
 	}
+	enddoaction(drawflag);
+}
+
+function enddoaction(drawflag) {
 	turn++;
 	if (turn % 6 == 0) {
 		for (var i = 0 ; i < 6 ; i++) {
 			pmoved[i] = 0;
 		}
 	}
+	occnum[0][turn] = poccupy[0] + poccupy[1] + poccupy[2];
+	occnum[1][turn] = poccupy[3] + poccupy[4] + poccupy[5];
 	if (drawflag) {
 		draw();
 	}
@@ -559,6 +657,7 @@ function calcinput() {
 		document.getElementById("pl0").value = input[0];
 		document.getElementById("pl1").value = input[1];
 	}
+	goturn(turn);
 }
 
 function saveinput(pl) {
@@ -571,28 +670,95 @@ function saveinput(pl) {
 }
 
 function mousemove(evt) {
-	mx = Math.floor((evt.clientX - canvas.getBoundingClientRect().left) / ssize);
-	my = Math.floor((evt.clientY - canvas.getBoundingClientRect().top) / ssize);
+	mx = evt.clientX - canvas.getBoundingClientRect().left;
+	my = evt.clientY - canvas.getBoundingClientRect().top;
 	draw();
+}
+
+function canvasclick() {
+	if (gamedata['title'] !== undefined && mx >= gx && mx <= gx + 96 * hx + 10 && my >= gy - hy * 180 + 10 && my <= gy + 20) {
+		var t = Math.floor((mx - gx) / hx);
+		if (t > 96) {
+			t = 96;
+		}
+		goturn(t);
+	}
+}
+
+function nextkill(prevflag) {
+	if (gamedata['title'] !== undefined) {
+		if (!prevflag) {
+			for (var t = turn + 1 ; t <= 96 ; t++) {
+				if (kill[t]) {
+					goturn(t);
+					break;
+				}
+			}
+		}
+		else {
+			for (var t = turn - 1 ; t > 0 ; t--) {
+				if (kill[t]) {
+					goturn(t);
+					break;
+				}
+			}
+		}
+	}
+}
+
+function keydown(evt) {
+	if (evt.keyCode == 39) {
+		if (!evt.shiftKey) {
+			doaction(true);
+		}
+		else {
+			nextkill(false);
+		}
+	}
+	else if (evt.keyCode == 37) {
+		if (!evt.shiftKey) {
+			goturn(turn - 1);
+		}
+		else {
+			nextkill(true);
+		}
+	}
+	else if (evt.keyCode == 38) {
+		goturn(0);
+	}
+	else if (evt.keyCode == 40) {
+		goturn(96);
+	}
+}
+
+function mousewheel(evt) {
+	if (evt.deltaY > 0) {
+		doaction(true);
+	}
+	else {
+		goturn(turn - 1);
+	}
 }
 
 </script>
 
 </head>
 <body id="body" onload="PageLoad();">
-	Samurai visualizer ver 3.0 (last update 2016/12/28)<br>
-	<canvas id="canvas" width="900" height="710" onmousemove="mousemove(event)"></canvas><br>
-	<input type="button" value="最初へ" onClick="goturn(0);">
-	<input type="button" value="前のターン" onClick="goturn(turn - 1);">
-	<input type="button" value="次のターン" onClick="doaction(true);">
-	<input type="button" value="最後へ" onClick="goturn(96);">
+	Samurai visualizer ver 4.0 (last update 2016/12/29)<br>
+	<canvas id="canvas" width="1200" height="710" onmousemove="mousemove(event);" onclick="canvasclick();"></canvas><br>
+	<input type="button" value="最初へ(↑)" onClick="goturn(0);">
+	<input type="button" value="前(←,wheel+)" onClick="goturn(turn - 1);">
+	<input type="button" value="次(→,wheel-)" onClick="doaction(true);">
+	<input type="button" value="最後へ(↓)" onClick="goturn(96);">
+	<input type="button" value="次の撃破(Shift+←)" onClick="nextkill(false);">
+	<input type="button" value="前の撃破(Shift+→)" onClick="nextkill(true);">
 	Turn <input value="0" id="turn" size="2" onChange="changeturntb();"> <input type="range" value="0" min="0" max="96" step="1" width="196" id="slider" onChange="changeturnslider();">
 	視界：<input type="radio" id="sikaiall" name="sikai" value="all" checked onChange="draw();">全<input type="radio" id="sikaired" name="sikai" value="red" onChange="draw();">赤<input type="radio" id="sikaiblue" name="sikai" value="blue" onChange="draw();">青<br>
 	<hr>
-	本家のリプレイのページ上でページ上のデータを全選択してコピーし、下記のテキストボックスにで貼り付けることでリプレイを読み込むことができます。<br>
+	本家のリプレイのページ上でページ上のデータを全選択してコピーし、下記のテキストボックスに貼り付けることでリプレイを読み込むことができます。<br>
 	<input id="data" size="50"><input type="button" value="リプレイ読み込み" onClick="loadreplay();">
 	<hr>
-	プレーヤー１の出力: <textarea id="pl0" size=50"></textarea> <a download="pl1.txt" href="" onClick="saveinput(0);" id="dl0">ファイルに保存</a><br>
-	プレーヤー２の出力: <textarea id="pl1" size=50"></textarea> <a download="pl2.txt" href="" onClick="saveinput(1);" id="dl1">ファイルに保存</a>
+	プレーヤー１の出力: <textarea id="pl0" cols="50" rows="1"></textarea> <a download="pl1.txt" href="" onClick="saveinput(0);" id="dl0">ファイルに保存</a><br>
+	プレーヤー２の出力: <textarea id="pl1" cols="50" rows="1"></textarea> <a download="pl2.txt" href="" onClick="saveinput(1);" id="dl1">ファイルに保存</a>
 </body>
 </html>
