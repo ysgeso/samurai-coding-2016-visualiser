@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-<title>Samurai Visualizer ver 4.1</title>
+<title>Samurai Visualizer ver 4.3</title>
 <style>
 body {
 	line-height: 1.2;
@@ -414,13 +414,11 @@ function doaction(drawflag) {
 			pcure[i]--;
 		}
 	}
-	if (snum < 0 || turndata['actions'].length == 0) {
-		if (snum < 0 || pcure[snum] > 0) {
-			actionmsg = "パス(治療中 or 不正な行動)";
-			actionplayernum = -1;
-			enddoaction(drawflag);
-			return;
-		}
+	if (snum < 0 || turndata['actions'].length == 0 || pcure[snum] > 0) {
+		actionmsg = "パス(治療中 or 不正な行動)";
+		actionplayernum = -1;
+		enddoaction(drawflag);
+		return;
 	}
 	actionplayernum = snum;
 	// エラーに関係なく行動は出力する
@@ -744,7 +742,7 @@ function mousewheel(evt) {
 
 </head>
 <body id="body" onload="PageLoad();">
-	Samurai visualizer ver 4.1 (last update 2016/12/29)<br>
+	Samurai visualizer ver 4.3 (last update 2016/12/31)<br>
 	<canvas id="canvas" width="1200" height="710" onmousemove="mousemove(event);" onclick="canvasclick();"></canvas><br>
 	<input type="button" value="最初へ(↑)" onClick="goturn(0);">
 	<input type="button" value="前(←,wheel+)" onClick="goturn(turn - 1);">
