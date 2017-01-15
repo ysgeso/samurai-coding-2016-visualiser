@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-<title>Samurai Visualizer ver 4.5</title>
+<title>Samurai Visualizer ver 4.6</title>
 <style>
 body {
 	line-height: 1.2;
@@ -170,8 +170,12 @@ function draw() {
 				}
 			}
 			var plen = 0;
+			var pdead = false;
 			for (var i = 0 ; i < 6 ; i++) {
 				if (px[i] == x && py[i] == y) {
+					if (pcure[i] > 0) {
+						pdead = true;
+					}
 					plen++;
 				}
 			}
@@ -181,31 +185,58 @@ function draw() {
 				var paddingx = 3;
 				var paddingy = 3;
 				var left = (ssize - plen * fontsize / 2 - paddingx * 2) / 2;
-				var top = (ssize - fontsize - paddingy * 2) / 2; 
-				ctx.rect(ssize * x + left, ssize * y + top, plen * fontsize / 2 + paddingx * 2 + 1 , fontsize + paddingy * 2);
-				ctx.strokeWidth = 1;
-				ctx.strokeStyle = "black";
-				ctx.fillStyle = "white";
-				ctx.fill();
-				ctx.stroke();
+				var top = (ssize - fontsize - paddingy * 2) / 2;
+				if (pdead == false) {
+					ctx.rect(ssize * x + left, ssize * y + top, plen * fontsize / 2 + paddingx * 2 + 1 , fontsize + paddingy * 2);
+					ctx.strokeWidth = 1;
+					ctx.strokeStyle = "black";
+					ctx.fillStyle = "white";
+					ctx.fill();
+					ctx.stroke();
+				}
 				left += paddingx + 1;
 				top += paddingy + fontsize - 1;
-				ctx.fillStyle = "black";
+				var count = 0;
 				for (var i = 0 ; i < 6 ; i++) {
 					if (px[i] == x && py[i] == y) {
-						if (actionplayernum == i) {
-							ctx.strokeStyle = "#33ff33";
-							for (var j = 1 ; j <= 6 ; j++) {
-								ctx.beginPath();
-								ctx.rect(ssize * x + j, ssize * y + j, ssize - j * 2, ssize - j * 2);
-								ctx.stroke();
-							}
+						// 死亡しているということは、本拠地に必ず一人でいるはず
+						if (pdead == true) {
+							ctx.fillStyle = "black";
+							ctx.beginPath();
+							ctx.arc(ssize * (x + 0.5), ssize * (y + 0.5), ssize / 3, 0, Math.PI * 2);
+							ctx.fill();
+							ctx.fillStyle = "#777777";
+							ctx.beginPath();
+							ctx.moveTo(ssize * (x + 0.5), ssize * (y + 0.5));
+							ctx.arc(ssize * (x + 0.5), ssize * (y + 0.5), ssize / 3, -Math.PI / 2, Math.PI * 2 * (18 - pcure[i]) / 18 - Math.PI / 2);
+							ctx.fill();
 							ctx.font = "bold " + fontsize + "px sans-serif";
 						}
 						else {
-							ctx.font = fontsize + "px sans-serif";
+							if (actionplayernum == i) {
+								ctx.strokeStyle = "#33ff33";
+								for (var j = 1 ; j <= 6 ; j++) {
+									ctx.beginPath();
+									ctx.rect(ssize * x + j, ssize * y + j, ssize - j * 2, ssize - j * 2);
+									ctx.stroke();
+								}
+								ctx.font = "bold " + fontsize + "px sans-serif";
+							}
+							else {
+								ctx.font = fontsize + "px sans-serif";
+							}
+							if (pmoved[i] == 1) {
+								ctx.fillStyle = "#aaaaaa";
+								ctx.beginPath();
+								ctx.rect(ssize * px[i] + left - (count == 0 ? paddingx : 0), ssize * py[i] + top - fontsize - paddingy + 2, fontsize / 2 + (count == 0 ? paddingx : 0) + (count == plen - 1 ? paddingx - 1 : 0), fontsize + paddingy * 2 - 2);
+								ctx.fill();
+							}
+							count++;
 						}
-						if (phidden[i] == 0) {
+						if (pdead == true) {
+							ctx.fillStyle = "white";
+						}
+						else if (phidden[i] == 0) {
 							ctx.fillStyle = "black";
 						}
 						else {
@@ -240,14 +271,6 @@ function draw() {
 		ctx.fillText(gamedata["playerNames"][1], csize + 10, 120);
 	}
 
-	var bx = Math.floor(mx / ssize);
-	var by = Math.floor(my / ssize);
-	if (bx >= 0 && bx < fwidth && by >= 0 && by < fheight) {
-		ctx.fillStyle = "black";
-		ctx.font = "20px sans-serif";
-		ctx.fillText("マウスの位置 (" + bx + ", " + by + ")", csize + 10, 225);
-	}
-
 	var tx = 0;
 	var lx = 0;
 	for (var i = 0 ; i < 7 ; i++) {
@@ -259,6 +282,7 @@ function draw() {
 		if (i == 6) {
 			ctx.fillStyle = "black";
 		}
+		ctx.font = "20px sans-serif";
 		ctx.fillText(poccupy[i], tx, csize + 105);
 		tx += 20 + ((poccupy[i] >= 100) ? 20 : ((poccupy[i] >= 10) ? 10 : 0));
 		if (tx < lx) {
@@ -302,14 +326,28 @@ function draw() {
 		}
 	}
 
+	var bx = Math.floor(mx / ssize);
+	var by = Math.floor(my / ssize);
+	if (bx >= 0 && bx < fwidth && by >= 0 && by < fheight) {
+		ctx.fillStyle = "black";
+		ctx.font = "20px sans-serif";
+		ctx.fillText("マウスの位置 (" + bx + ", " + by + ")", csize + 10, 225);
+		ctx.beginPath();
+		ctx.fillStyle = "rgba(127, 127, 127, 0.5)";
+		ctx.rect(mx, my, 80, 32);
+		ctx.fill();
+		ctx.font = "bold 20px sans-serif";
+		ctx.fillStyle = "black";
+		ctx.fillText("(" + bx + ", " + by + ")", mx + 5, my + 25);
+	}
+
 	// グラフを書く
-  ctx.strokeStyle = "#CCFFCC";
-  ctx.beginPath();
-  for (var p = 1 ; p < 16; ++p) {
-    ctx.moveTo(gx + p * 6 * hx, gy);
-    ctx.lineTo(gx + p * 6 * hx, gy - 180 * hy);
-    ctx.stroke();
-  }
+	ctx.fillStyle = "#e0ffe0";
+	ctx.beginPath();
+	for (var p = 1 ; p < 16; p += 2) {
+		ctx.rect(gx + p * 6 * hx, gy - 180 * hy, 6 * hx, 180 * hy);
+		ctx.fill();
+	}
 	var t = -1;
 	if (gamedata['title'] !== undefined && mx >= gx && mx <= gx + 96 * hx + 10 && my >= gy - hy * 180 + 10 && my <= gy + 20) {
 			t = Math.floor((mx - gx) / hx);
@@ -424,7 +462,7 @@ function doaction(drawflag) {
 		}
 	}
 	if (snum < 0 || turndata['actions'].length == 0 || pcure[snum] > 0) {
-		actionmsg = "パス(治療中 or 不正な行動)";
+		actionmsg += "パス(治療中 or 不正な行動)";
 		actionplayernum = -1;
 		enddoaction(drawflag);
 		return;
@@ -765,7 +803,7 @@ function mousewheel(evt) {
 
 </head>
 <body id="body" onload="PageLoad();">
-	Samurai visualizer ver 4.5 (last update 2017/1/5)<br>
+	Samurai visualizer ver 4.6 (last update 2017/1/15)<br>
 	<canvas id="canvas" width="1200" height="710" onmousemove="mousemove(event);" onclick="canvasclick();"></canvas><br>
 	<input type="button" value="最初へ(↑)" onClick="goturn(0);">
 	<input type="button" value="前(←,wheel+)" onClick="goturn(turn - 1);">
