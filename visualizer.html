@@ -728,6 +728,15 @@ function saveinput(pl) {
 	a.href = URL.createObjectURL(blob);
 }
 
+function saveinputjson() {
+	if (input.length == 0) {
+		alert("リプレイデータが読み込まれていません。空のファイルを出力します。");
+	}
+	var blob = new Blob([JSON.stringify(gamedata, null, '  ')], {type: "application/json"});
+	var a = document.getElementById("dlj");
+	a.href = URL.createObjectURL(blob);
+}
+
 function mousemove(evt) {
 	mx = evt.clientX - canvas.getBoundingClientRect().left;
 	my = evt.clientY - canvas.getBoundingClientRect().top;
@@ -815,7 +824,7 @@ function mousewheel(evt) {
 	視界：<input type="radio" id="sikaiall" name="sikai" value="all" checked onChange="draw();">全<input type="radio" id="sikaired" name="sikai" value="red" onChange="draw();">赤<input type="radio" id="sikaiblue" name="sikai" value="blue" onChange="draw();">青<br>
 	<hr>
 	本家のリプレイのページ上でページ上のデータを全選択してコピーし、下記のテキストボックスに貼り付けることでリプレイを読み込むことができます。<br>
-	<input id="data" size="50"><input type="button" value="リプレイ読み込み" onClick="loadreplay();">
+	<input id="data" size="50"><input type="button" value="リプレイ読み込み" onClick="loadreplay();"> <a download="game.json" href="" onClick="saveinputjson();" id="dlj">ファイルに保存</a>
 	<hr>
 	プレーヤー１の出力: <textarea id="pl0" cols="50" rows="1"></textarea> <a download="pl1.txt" href="" onClick="saveinput(0);" id="dl0">ファイルに保存</a>　行動<textarea id="ac0" cols="50" rows="1"></textarea><br>
 	プレーヤー２の出力: <textarea id="pl1" cols="50" rows="1"></textarea> <a download="pl2.txt" href="" onClick="saveinput(1);" id="dl1">ファイルに保存</a>　行動<textarea id="ac1" cols="50" rows="1"></textarea>
