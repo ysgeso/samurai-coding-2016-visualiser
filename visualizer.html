@@ -303,6 +303,13 @@ function draw() {
 	}
 
 	// グラフを書く
+  ctx.strokeStyle = "#CCFFCC";
+  ctx.beginPath();
+  for (var p = 1 ; p < 16; ++p) {
+    ctx.moveTo(gx + p * 6 * hx, gy);
+    ctx.lineTo(gx + p * 6 * hx, gy - 180 * hy);
+    ctx.stroke();
+  }
 	var t = -1;
 	if (gamedata['title'] !== undefined && mx >= gx && mx <= gx + 96 * hx + 10 && my >= gy - hy * 180 + 10 && my <= gy + 20) {
 			t = Math.floor((mx - gx) / hx);
