@@ -475,6 +475,10 @@ function doaction(drawflag) {
 	}
 	actionmsg += "0 」 ";
 	for (var i = 0 ; i < turndata['actions'].length ; i++) {
+		if (pmoved[snum] == 1) {
+			actionmsg += "エラー  ";
+			break;
+		}
 		var action = turndata['actions'][i];
 		if (action >= 1 && action <= 4) {
 			actionmsg += actiontext[action] + "  ";
