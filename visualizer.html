@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-<title>Samurai Visualizer ver 4.7</title>
+<title>Samurai Visualizer ver 4.8</title>
 <style>
 body {
 	line-height: 1.2;
@@ -21,6 +21,7 @@ var gx = csize + 35;
 var gy = 600;
 var hx = 5;
 var hy = 2;
+var maxy = 180;
 
 var color = [ "#ff0000", "#ff3333", "#ff6666", "#0000ff", "#3333ff", "#6666ff", "#eeeeee" ];
 var pbx = [ 0, 0, 7, 14, 14, 7 ];
@@ -32,6 +33,7 @@ var pcure = [];
 var poccupy = [];
 var pmoved = [];
 var	occnum = [ [], [] ];
+var restime = [];
 var	kill = [];
 var turn;
 var typename = [ "槍", "刀", "鉞" ];
@@ -91,6 +93,7 @@ function PageLoad(evt) {
 	sikaiallrb = document.getElementById('sikaiall');
 	sikairedrb = document.getElementById('sikaired');
 	sikaibluerb = document.getElementById('sikaiblue');
+	restimecb = document.getElementById('restime');
 
 	document.onkeydown = keydown;
 	document.onwheel = mousewheel;
@@ -134,6 +137,7 @@ function initgame() {
 	poccupy[6] = 0;
 	kill[0] = 0;
 	occnum[0][0] = occnum[1][0] = 3;
+	restime[0] = 0;
 	turn = 0;
 	actionmsg = "";
 	actionplayernum = -1;
@@ -345,11 +349,11 @@ function draw() {
 	ctx.fillStyle = "#e0ffe0";
 	ctx.beginPath();
 	for (var p = 1 ; p < 16; p += 2) {
-		ctx.rect(gx + p * 6 * hx, gy - 180 * hy, 6 * hx, 180 * hy);
+		ctx.rect(gx + p * 6 * hx, gy - maxy * hy, 6 * hx, maxy * hy);
 		ctx.fill();
 	}
 	var t = -1;
-	if (gamedata['title'] !== undefined && mx >= gx && mx <= gx + 96 * hx + 10 && my >= gy - hy * 180 + 10 && my <= gy + 20) {
+	if (gamedata['title'] !== undefined && mx >= gx && mx <= gx + 96 * hx + 10 && my >= gy - hy * maxy && my <= gy + 20) {
 			t = Math.floor((mx - gx) / hx);
 			if (t > 96) {
 				t = 96;
@@ -358,7 +362,7 @@ function draw() {
 			ctx.lineWidth = 1;
 			ctx.beginPath();
 			ctx.moveTo(gx + t * hx, gy);
-			ctx.lineTo(gx + t * hx, gy - 180 * hy);
+			ctx.lineTo(gx + t * hx, gy - maxy * hy);
 			ctx.stroke();
 			ctx.fillStyle = "black";
 			ctx.font = "16px sans-serif";
@@ -368,8 +372,12 @@ function draw() {
 			if (t * hx + twidth > hx * 96) {
 				x = gx + t * hx - twidth - 2;
 			}
-			ctx.fillText(txt, x, my);
-			ctx.fillText("クリックするとそのターンへ移動します。", gx + 100, gy + 60);
+			ctx.fillText(txt, x, my - 15);
+			if (restimecb.checked) {
+				txt = "response time = " + restime[t];
+				ctx.fillText(txt, x, my);
+			}
+			ctx.fillText("クリックするとそのターンへ移動します。", gx + 100, gy + 80);
 	}
 	ctx.strokeStyle = "black";
 	ctx.lineWidth = 1;
@@ -390,9 +398,9 @@ function draw() {
 	}
 	ctx.beginPath();
 	ctx.moveTo(gx, gy);
-	ctx.lineTo(gx, gy - hy * 180);
+	ctx.lineTo(gx, gy - hy * maxy);
 	ctx.stroke();
-	for (var y = 0 ; y <= 180 ; y++) {
+	for (var y = 0 ; y <= maxy ; y++) {
 		if (y % 50 == 0) {
 			ctx.moveTo(gx, gy - y * hy);
 			ctx.lineTo(gx + 5, gy - y * hy);
@@ -417,16 +425,32 @@ function draw() {
 				ctx.fill();
 			}
 		}
+		if (restimecb.checked) {
+			ctx.beginPath();
+			ctx.strokeStyle = (i == 0) ? "#ffaaaa" : "#aaaaff";
+			ctx.lineWidth = 1;
+			ctx.moveTo(gx, gy);
+			for (var t = 1 + i ; t <= 95 + i ; t += 2) {
+				ctx.lineTo(gx + t * hx, gy - hy * restime[t]);
+			}
+			ctx.stroke();
+		}
 	}
 	if (gamedata['title'] !== undefined) {
 		ctx.strokeStyle = "gray";
 		ctx.lineWidth = 1;
 		ctx.beginPath();
 		ctx.moveTo(gx + turn * hx, gy);
-		ctx.lineTo(gx + turn * hx, gy - 180 * hy);
+		ctx.lineTo(gx + turn * hx, gy - maxy * hy);
 		ctx.stroke();
 		ctx.fillStyle = "black";
 		ctx.fillText("●はそのターンで撃破されたことを表します。", gx + 100, gy + 40);
+		if (restimecb.checked) {
+			ctx.fillText("薄いグラフは responseTime を表します。", gx + 100, gy + 60);
+		}
+		else {
+			ctx.fillText("下の時間表示を ON にすることで responseTime を表します。", gx + 100, gy + 60);
+		}
 	}	
 
 	turntb.value = turn;
@@ -455,6 +479,7 @@ function doaction(drawflag) {
 	var allynum = (turn % 2) * 3;
 	var enenum = 3 - allynum;
 	actionmsg = snum + "(" + typename[stype] + ")の行動 " + turndata['responseTime'] + "ms  ";
+	restime[turn + 1] = turndata['responseTime'];
 	kill[turn + 1] = 0;
 	for (var i = 0 ; i < 6 ; i++) {
 		if (pcure[i] > 0) {
@@ -751,7 +776,7 @@ function mousemove(evt) {
 }
 
 function canvasclick() {
-	if (gamedata['title'] !== undefined && mx >= gx && mx <= gx + 96 * hx + 10 && my >= gy - hy * 180 + 10 && my <= gy + 20) {
+	if (gamedata['title'] !== undefined && mx >= gx && mx <= gx + 96 * hx + 10 && my >= gy - hy * maxy && my <= gy + 20) {
 		var t = Math.floor((mx - gx) / hx);
 		if (t > 96) {
 			t = 96;
@@ -819,16 +844,16 @@ function mousewheel(evt) {
 
 </head>
 <body id="body" onload="PageLoad();">
-	Samurai visualizer ver 4.7 (last update 2017/1/16)<br>
+	Samurai visualizer ver 4.8 (last update 2017/1/17)<br>
 	<canvas id="canvas" width="1200" height="710" onmousemove="mousemove(event);" onclick="canvasclick();"></canvas><br>
-	<input type="button" value="最初へ(↑)" onClick="goturn(0);">
+	<input type="button" value="最初(↑)" onClick="goturn(0);">
 	<input type="button" value="前(←,wheel+)" onClick="goturn(turn - 1);">
 	<input type="button" value="次(→,wheel-)" onClick="doaction(true);">
-	<input type="button" value="最後へ(↓)" onClick="goturn(96);">
-	<input type="button" value="前の撃破(Shift+←)" onClick="nextkill(true);">
-	<input type="button" value="次の撃破(Shift+→)" onClick="nextkill(false);">
+	<input type="button" value="最後(↓)" onClick="goturn(96);">
+	<input type="button" value="前撃破(Shift+←)" onClick="nextkill(true);">
+	<input type="button" value="次撃破(Shift+→)" onClick="nextkill(false);">
 	Turn <input value="0" id="turn" size="2" onChange="changeturntb();"> <input type="range" value="0" min="0" max="96" step="1" width="196" id="slider" onChange="changeturnslider();">
-	視界：<input type="radio" id="sikaiall" name="sikai" value="all" checked onChange="draw();">全<input type="radio" id="sikaired" name="sikai" value="red" onChange="draw();">赤<input type="radio" id="sikaiblue" name="sikai" value="blue" onChange="draw();">青<br>
+	視界：<input type="radio" id="sikaiall" name="sikai" value="all" checked onChange="draw();">全<input type="radio" id="sikaired" name="sikai" value="red" onChange="draw();">赤<input type="radio" id="sikaiblue" name="sikai" value="blue" onChange="draw();">青　<input type="checkbox" id="restime" onChange="draw();">時間表示<br>
 	<hr>
 	本家のリプレイのページ上でページ上のデータを全選択してコピーし、下記のテキストボックスに貼り付けることでリプレイを読み込むことができます。<br>
 	<input id="data" size="50"><input type="button" value="リプレイ読み込み" onClick="loadreplay();"> <a download="game.json" href="" onClick="saveinputjson();" id="dlj">ファイルに保存</a>
