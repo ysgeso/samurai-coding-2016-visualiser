@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-<title>Samurai Visualizer ver 4.9</title>
+<title>Samurai Visualizer ver 5.0</title>
 <style>
 body {
 	line-height: 1.2;
@@ -109,8 +109,8 @@ function PageLoad(evt) {
 	mx = my = 0;
 	document.getElementById("pl0").value = "";
 	document.getElementById("pl1").value = "";
-	document.getElementById("ac0").value = "";
-	document.getElementById("ac1").value = "";
+	document.getElementById("pl2").value = "";
+	document.getElementById("pl3").value = "";
 	input = [];
 	initgame();
 	draw();
@@ -525,7 +525,7 @@ function doaction(drawflag) {
 					actionfield[x][y] = 1;
 					for (var k = enenum ; k < enenum + 3 ; k++) {
 						if (x == px[k] && y == py[k]) {
-							pcure[k] = 18;
+							pcure[k] = 17;
 							px[k] = pbx[k];
 							py[k] = pby[k];
 							phidden[k] = 0;
@@ -681,19 +681,18 @@ function loadreplay() {
 }
 
 function calcinput() {
-	input = [ "0\n", "1\n" ];
-	action = [ "{", "{" ];
+	input = [ "", "" ];
+	action = [ "", "" ];
 	initgame();
 	for (var turn = 0 ; turn < 96 ; turn++) {
 		var turndata = gamedata['plays'][turn];
-		action[turn % 2] += '"' + turndata['samurai'] + " ";
+		action[turn % 2] += turndata['samurai'] + " ";
 		for (var i = 0; i < turndata['actions'].length ; i++) {
 			action[turn % 2] += turndata['actions'][i] + " ";
 		}
-		action[turn % 2] += '0"';
-		if (turn < 94) {
-			action[turn % 2] += ',';
-		}
+		action[turn % 2] += '0\n';
+	}
+	for (var turn = 0 ; turn < 96 ; turn++) {
 		goturn(turn);
 		var pl = turn % 2;
 		input[pl] += turn + "\n";
@@ -743,12 +742,14 @@ function calcinput() {
 			input[pl] += "\n";
 		}
 	}
-	action[0] += "}";
-	action[1] += "}";
+	action[0] = "0\n" + action[0] + input[0];
+	action[1] = "1\n" + action[1] + input[1];
+	input[0] = "0\n" + input[0];
+	input[1] = "1\n" + input[1];
 	document.getElementById("pl0").value = input[0];
 	document.getElementById("pl1").value = input[1];
-	document.getElementById("ac0").value = action[0];
-	document.getElementById("ac1").value = action[1];
+	document.getElementById("pl2").value = action[0];
+	document.getElementById("pl3").value = action[1];
 	goturn(turn);
 }
 
@@ -845,7 +846,7 @@ function mousewheel(evt) {
 
 </head>
 <body id="body" onload="PageLoad();">
-	Samurai visualizer ver 4.9 (last update 2017/1/22)<br>
+	Samurai visualizer ver 5.0 (last update 2017/1/25)<br>
 	<canvas id="canvas" width="1200" height="710" onmousemove="mousemove(event);" onclick="canvasclick();"></canvas><br>
 	<input type="button" value="最初(↑)" onClick="goturn(0);">
 	<input type="button" value="前(←,wheel+)" onClick="goturn(turn - 1);">
@@ -859,7 +860,7 @@ function mousewheel(evt) {
 	本家のリプレイのページ上でページ上のデータを全選択してコピーし、下記のテキストボックスに貼り付けることでリプレイを読み込むことができます。<br>
 	<input id="data" size="50"><input type="button" value="リプレイ読み込み" onClick="loadreplay();"> <a download="game.json" href="" onClick="saveinputjson();" id="dlj">ファイルに保存</a>
 	<hr>
-	プレーヤー１の出力: <textarea id="pl0" cols="50" rows="1"></textarea> <a download="pl1.txt" href="" onClick="saveinput(0);" id="dl0">ファイルに保存</a>　行動<textarea id="ac0" cols="50" rows="1"></textarea><br>
-	プレーヤー２の出力: <textarea id="pl1" cols="50" rows="1"></textarea> <a download="pl2.txt" href="" onClick="saveinput(1);" id="dl1">ファイルに保存</a>　行動<textarea id="ac1" cols="50" rows="1"></textarea>
+	プレーヤー１の出力: <textarea id="pl0" cols="30" rows="1"></textarea> <a download="pl1.txt" href="" onClick="saveinput(0);" id="dl0">ファイルに保存</a>　行動付き（手番情報の後）<textarea id="pl2" cols="30" rows="1"></textarea> <a download="pl1a.txt" href="" onClick="saveinput(2);" id="dl2">ファイルに保存</a><br>
+	プレーヤー２の出力: <textarea id="pl1" cols="30" rows="1"></textarea> <a download="pl2.txt" href="" onClick="saveinput(1);" id="dl1">ファイルに保存</a>　行動付き（手番情報の後）<textarea id="pl3" cols="30" rows="1"></textarea> <a download="pl2a.txt" href="" onClick="saveinput(3);" id="dl3">ファイルに保存</a>
 </body>
 </html>
