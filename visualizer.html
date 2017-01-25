@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-<title>Samurai Visualizer ver 5.0</title>
+<title>Samurai Visualizer ver 5.1</title>
 <style>
 body {
 	line-height: 1.2;
@@ -489,11 +489,15 @@ function doaction(drawflag) {
 		actionmsg += turndata['actions'][i] + " ";
 	}
 	actionmsg += "0 」 ";
-	if (snum < 0 || turndata['actions'].length == 0 || pcure[snum] > 0) {
-		actionmsg += "パス(治療中 or 不正な行動)";
+	if (snum < 0) {
+		actionmsg += "不正な行動";
 		actionplayernum = -1;
 	}
-	if (pmoved[snum] == 1) {
+	else if (pcure[snum] > 0) {
+		actionmsg += "治療中";
+		actionplayernum = -1;
+	}
+	else if (pmoved[snum] == 1) {
 		actionmsg += "すでに行動しています（不正な行動)";
 		actionplayernum = -1;
 	}
@@ -503,6 +507,9 @@ function doaction(drawflag) {
 		}
 	}
 	if (actionplayernum < 0) {
+		if (snum >= 0) {
+			pmoved[snum] = 1;
+		}
 		enddoaction(drawflag);
 		return;
 	}
@@ -551,7 +558,7 @@ function doaction(drawflag) {
 						if (j == snum) {
 							continue;
 						}
-						if (x == px[j] && y == py[j] && phidden[j] == 0) {
+						if (x == px[j] && y == py[j] && phidden[j] == 0 && phidden[snum] == 0) {
 							error = true;
 							break;
 						}
@@ -846,7 +853,7 @@ function mousewheel(evt) {
 
 </head>
 <body id="body" onload="PageLoad();">
-	Samurai visualizer ver 5.0 (last update 2017/1/25)<br>
+	Samurai visualizer ver 5.1 (last update 2017/1/25)<br>
 	<canvas id="canvas" width="1200" height="710" onmousemove="mousemove(event);" onclick="canvasclick();"></canvas><br>
 	<input type="button" value="最初(↑)" onClick="goturn(0);">
 	<input type="button" value="前(←,wheel+)" onClick="goturn(turn - 1);">
