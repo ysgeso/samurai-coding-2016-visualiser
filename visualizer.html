@@ -2,46 +2,78 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-<title>Samurai Visualizer ver 5.2</title>
+<title>Samurai Visualizer ver 5.3</title>
 <style>
 body {
 	line-height: 1.2;
 }
 </style>
 <script>
+// 読み込んだゲームデータ
 var gamedata = {};
+// キャンバスのコンテキスト
 var ctx;
+// field: ゲームのフィールドの情報（0～5：そこを占領したプレーヤーの番号、6:未占領）
+// fieldb: 本拠地を表すフィールド（0：本拠地ではない、1:本拠地）
+// actionfield: 直前のターンに占領した場所（0：占領していない、1:占領した）
+// いずれも (x,y) を [x][y] で表現する二次元配列
 var field, fieldb, actionfield;
+// フィールドの幅、高さ
 var fwidth = 15;
 var fheight = 15;
+// マスのサイズ
 var ssize = 40;
+// フィールド全体の描画サイズ
 var csize = ssize * fwidth;
 // グラフ関連のパラメータ
+// グラフの左上の点の座標
 var gx = csize + 35;
 var gy = 600;
+// 1ターンあたりの x軸方向の幅
 var hx = 5;
+// 占領数 1 あたりの y軸方向の高さ
 var hy = 2;
+// グラフの y 軸の最大値
 var maxy = 180;
+// マウスの座標
+var mx, my;
 
+// 各キャラクターの色
 var color = [ "#ff0000", "#ff3333", "#ff6666", "#0000ff", "#3333ff", "#6666ff", "#eeeeee" ];
+// 各キャラクターの本拠地の座標
 var pbx = [ 0, 0, 7, 14, 14, 7 ];
 var pby = [ 0, 7, 0, 14, 7, 14 ];
+// 各キャラクターの位置の座標
 var px = [];
 var py = [];
+// 各キャラクターが隠蔽状態かどうか(0:顕現状態、1:隠蔽状態）
 var phidden = [];
+// 各キャラクターの治療ターン数
 var pcure = [];
+// 各キャラクターの占領数（0～5:キャラクター毎の占領数、6:中立地帯の数）
 var poccupy = [];
+// 各キャラクターがそのピリオドに行動したかどうか（0:未行動、1:行動済）
 var pmoved = [];
+// ターン毎の各陣営の占領合計数
 var	occnum = [ [], [] ];
+// ターン毎の responseTime
 var restime = [];
+// ターン毎の死亡したキャラの陣営（0:死亡なし、1:先手、2:後手）
 var	kill = [];
+// 処理中のターン数
 var turn;
+// 武器IDに対応する武器の名前
 var typename = [ "槍", "刀", "鉞" ];
+// 行動の番号に対応する行動の種類（9は隠蔽、顕現の両方の意味を持つが、ここでは9を隠蔽、10を顕現とする）
 var actiontext = [ "", "南占領", "東占領", "北占領", "西占領", "南", "東", "北", "西", "隠伏", "顕現" ];
+// 画面に表示するそのターンの行動のメッセージ
 var actionmsg = "";
+// そのターンに行動したプレーヤーの番号(0～5、-1はタイムアウトまたは不正なID)
 var actionplayernum;
-var turnrb, turnslider, sikaiallrb, sikairedrb, sikaibluerb;
+// ターンを表すスライダー、全視界ボタン、赤視界ボタン、青視界ボタン、時間表示ボタン（rb:ラジオボタン、cb:チェックボックスの略）
+var turnslider, sikaiallrb, sikairedrb, sikaibluerb, restimecb;
 
+// それぞれの武器の占領場所のデータ
 var attackx = [ [	[  0,  0,  0,  0 ], [  0,  0,  1,  1,  2 ], [ -1, -1, -1,  0,  1,  1,  1 ] ],
 								[	[  1,  2,  3,  4 ], [  1,  2,  0,  1,  0 ], [ -1,  0,  1,  1, -1,  0,  1 ] ],
 								[	[  0,  0,  0,  0 ], [  0,  0, -1, -1, -2 ], [  1,  1,  1,  0, -1, -1, -1 ] ],
@@ -51,43 +83,58 @@ var attacky = [ [ [  1,  2,  3,  4 ], [  1,  2,  0,  1,  0 ], [ -1,  0,  1,  1, 
 								[	[ -1, -2, -3, -4 ], [ -1, -2,  0, -1,  0 ], [  1,  0, -1, -1,  1,  0, -1 ] ],
 								[	[  0,  0,  0,  0 ], [  0,  0,  1,  1,  2 ], [ -1, -1, -1,  0,  1,  1,  1 ] ] ];
 
+// ファイルをキャンバス上にドラッグアンドドロップしたときのイベントハンドラ
 function handleFileSelect(evt) {
 	evt.stopPropagation();
 	evt.preventDefault();
 
+	// ドロップしたファイル
 	var files = evt.dataTransfer.files; 
-
 	var output = [];
-	for (var i = 0; i < files.length; i++) {
 
+	// ドロップしたファイルの数だけ繰り返す
+	for (var i = 0; i < files.length; i++) {
 		var reader = new FileReader();
+		// ファイルの読み込みが完了した時に実行される
 		reader.onload = (function(f) {
+			// JSON 形式のデータを配列にする
 			gamedata = JSON.parse(f.target.result);
+			// ファイルの中身に足りない部分があれば補う
 			if (gamedata['plays'] === undefined && gamedata.length == 96) {
 				gamedata['plays'] = gamedata;
 				gamedata['title'] = "";
 				gamedata['playerNames'] = [ "pl1", "pl2" ];
 			}
+			// ゲームデータの初期化
 			initgame();
+			// データの中身を計算する
 			calcinput();
+			// 0 ターン目に移動
 			goturn(0);
 			draw();
 		});
+		// ファイルを読み込む
 		reader.readAsText(files[i]);
 	}
 }
 
+// キャンバス上にドラッグ移動した時のイベントハンドラ
 function handleDragOver(evt) {
 	evt.stopPropagation();
 	evt.preventDefault();
 	evt.dataTransfer.dropEffect = 'copy';
 }
 
+// ページを読み込んだ時の処理
 function PageLoad(evt) {
+	// キャンバスを作成する
 	var canvas = document.getElementById('canvas');
+	// キャンバス上にドラッグ、ドロップしたときのイベントハンドラの定義
 	canvas.addEventListener('dragover', handleDragOver, false);
 	canvas.addEventListener('drop', handleFileSelect, false);
+	// キャンバスのコンテキストを取得
 	ctx = canvas.getContext('2d');
+	// ページ上のスライダー、チェックボタン、ラジオボタンを取得する
 	turntb = document.getElementById('turn');
 	turnslider = document.getElementById('slider');
 	sikaiallrb = document.getElementById('sikaiall');
@@ -95,9 +142,11 @@ function PageLoad(evt) {
 	sikaibluerb = document.getElementById('sikaiblue');
 	restimecb = document.getElementById('restime');
 
+	// キー入力、マウスホイールのイベントハンドラを設定
 	document.onkeydown = keydown;
 	document.onwheel = mousewheel;
 
+	// 必要な2次元配列変数を作る
 	field = [];
 	fieldb = [];
 	actionfield = [];
@@ -106,65 +155,93 @@ function PageLoad(evt) {
 		fieldb[x] = [];
 		actionfield[x] = [];
 	}
+	// マウスの座標の初期化
 	mx = my = 0;
+	// テキストボックスの初期化
 	document.getElementById("pl0").value = "";
 	document.getElementById("pl1").value = "";
 	document.getElementById("pl2").value = "";
 	document.getElementById("pl3").value = "";
+	// プレーヤーの出力データの初期化
 	input = [];
+	// ゲームを初期化する
 	initgame();
+	// 画面の描画
 	draw();
 }
 
+// ゲームの初期化
 function initgame() {
+	// フィールドなどを初期化する
 	for (var x = 0 ; x < fwidth ; x++) {
 		for (var y = 0 ; y < fheight ; y++) {
+			// すべて未占領状態に
 			field[x][y] = 6;
 			fieldb[x][y] = 0;
 			actionfield[x][y] = 0;
 		}
 	}
+	// 各キャラクターに関する初期化
 	for (var i = 0 ; i < 6 ; i++) {
+		// 本拠地の占領状態の更新
 		field[pbx[i]][pby[i]] = i;
+		// filedb に本拠地の場所を設定する
 		fieldb[pbx[i]][pby[i]] = 1;
+		// プレーヤーの位置を本拠地に設定する
 		px[i] = pbx[i];
-		py[i] = pby[i];
+		py[i] = pby[i];	
+		// 顕現状態、治療ターン数 0、占領数 1、未行動を設定
 		phidden[i] = 0;
 		pcure[i] = 0;
 		poccupy[i] = 1;
 		pmoved[i] = 0;
 	}
-	poccupy[6] = 0;
 	kill[0] = 0;
+	// 最初のターンの各陣営の占領数を 3 にする
 	occnum[0][0] = occnum[1][0] = 3;
+	// 最初のターンの responseTime を 0 に
 	restime[0] = 0;
+	// 最初のターンに
 	turn = 0;
+	// 最初のターンのメッセージを空に
 	actionmsg = "";
+	// 最初のターンの前に行動したキャラクターをなしに
 	actionplayernum = -1;
 }
 
+// 画面表示
 function draw() {
+	// データが読み込まれていない場合のメッセージ設定
 	if (gamedata['title'] === undefined) {
 		actionmsg = "データがありません。ファイルを上のキャンバスにドラッグアンドドロップしてください。";
 	}
+	// キャンバスをクリアする
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+	// ここからフィールドを描画する
+	// フィールドの枠を描画する
 	ctx.lineWidth = 1;
 	ctx.strokeStyle = "black";
 	ctx.beginPath();
 	ctx.rect(0, 0, csize, csize);
 	ctx.stroke();
+	// 各キャラクターと未占領地の占領数を初期化する
 	for (var i = 0 ; i < 7 ; i++) {
 		poccupy[i] = 0;
 	}
+	// フィールドの各マスを描画する
 	for (var x = 0 ; x < fwidth ; x++) {
 		for (var y = 0 ; y < fheight ; y++) {
+			// (x, y) のマスの枠を占領している陣営で塗りつぶし、枠を描画する
 			ctx.beginPath();
 			ctx.rect(ssize * x, ssize * y, ssize, ssize);
 			ctx.fillStyle = color[field[x][y]];
 			ctx.strokeStyle = "black";
 			ctx.fill();
 			ctx.stroke();
+			// 占領数の更新
 			poccupy[field[x][y]]++;
+			// 前のターンにそこを占領していた場合、そのマスの枠の内側に白い太線を描画する
 			if (actionfield[x][y] == 1) {
 				ctx.strokeStyle = "white";
 				for (var i = 1 ; i <= 3 ; i++) {
@@ -173,23 +250,34 @@ function draw() {
 					ctx.stroke();
 				}
 			}
+			// そのマスに存在するキャラクターの数を初期化する
 			var plen = 0;
+			// そのマスに存在するキャラクターが治療中かどうかのフラグ
 			var pdead = false;
+			// 各キャラクターについて、そのマスにいるかどうかを調べる
 			for (var i = 0 ; i < 6 ; i++) {
 				if (px[i] == x && py[i] == y) {
+					// 治療ターンが設定されていた場合は、そのキャラクターは治療中
+					// なお、治療中ということは本拠地におり、本拠地に他のキャラクターは存在できない
 					if (pcure[i] > 0) {
 						pdead = true;
 					}
 					plen++;
 				}
 			}
+			// そのマスにキャラクターが存在する場合、そのマスに長方形を描画し、その中にキャラクターの番号を描画する
 			if (plen > 0) {
 				ctx.beginPath();
+				// キャラクター番号のフォントサイズ
 				var fontsize = 16;
+				// 枠と左右の文字の間隔
 				var paddingx = 3;
+				// 枠と文字の上下の間隔
 				var paddingy = 3;
+				// 枠の左上の点の座標を計算する
 				var left = (ssize - plen * fontsize / 2 - paddingx * 2) / 2;
 				var top = (ssize - fontsize - paddingy * 2) / 2;
+				// 死亡していない場合は長方形とその枠を描画する（死亡している場合は円グラフを描くのでここでは何も描画しない）
 				if (pdead == false) {
 					ctx.rect(ssize * x + left, ssize * y + top, plen * fontsize / 2 + paddingx * 2 + 1 , fontsize + paddingy * 2);
 					ctx.strokeWidth = 1;
@@ -198,25 +286,34 @@ function draw() {
 					ctx.fill();
 					ctx.stroke();
 				}
+				// 最初のキャラクターの番号の座標の計算
 				left += paddingx + 1;
 				top += paddingy + fontsize - 1;
+				// キャラクターの番号を何個描画したか
 				var count = 0;
+				// そのマスにいるキャラクターについて、順番に番号を描画する処理を行う
 				for (var i = 0 ; i < 6 ; i++) {
 					if (px[i] == x && py[i] == y) {
-						// 死亡しているということは、本拠地に必ず一人でいるはず
+						// そのキャラクターが死亡している場合は、治療ターン数を表す円グラフを描画する
+						// なお、死亡しているということは、本拠地に必ず一人でいるはずなので、他のキャラクターがここに存在することはあり得ない
 						if (pdead == true) {
+							// 黒く塗りつぶされた円を描画する
 							ctx.fillStyle = "black";
 							ctx.beginPath();
 							ctx.arc(ssize * (x + 0.5), ssize * (y + 0.5), ssize / 3, 0, Math.PI * 2);
 							ctx.fill();
+							// 治療ターン経過ターン数を表す灰色の扇形を描画し、円グラフのような描画を行う
 							ctx.fillStyle = "#777777";
 							ctx.beginPath();
 							ctx.moveTo(ssize * (x + 0.5), ssize * (y + 0.5));
 							ctx.arc(ssize * (x + 0.5), ssize * (y + 0.5), ssize / 3, -Math.PI / 2, Math.PI * 2 * (18 - pcure[i]) / 18 - Math.PI / 2);
 							ctx.fill();
+							// 円グラフの中に描画する文字の設定。文字の描画は死亡していない場合と共通するので、この後行う
 							ctx.font = "bold " + fontsize + "px sans-serif";
 						}
+						// 死亡していない場合
 						else {
+							// このターンに行動したキャラクターの場合は、そのマスの枠の内側に緑色の太線を描画する
 							if (actionplayernum == i) {
 								ctx.strokeStyle = "#33ff33";
 								for (var j = 1 ; j <= 6 ; j++) {
@@ -224,39 +321,49 @@ function draw() {
 									ctx.rect(ssize * x + j, ssize * y + j, ssize - j * 2, ssize - j * 2);
 									ctx.stroke();
 								}
+								// このターンに行動したキャラクターの番号を太字にする
 								ctx.font = "bold " + fontsize + "px sans-serif";
 							}
 							else {
 								ctx.font = fontsize + "px sans-serif";
 							}
+							// 行動済の場合は、文字を描画する場所の背景色を灰色にする
 							if (pmoved[i] == 1) {
 								ctx.fillStyle = "#aaaaaa";
 								ctx.beginPath();
+								// 一番最初の場合は左のパディング、一番最後の場合は右のパディングも塗りつぶすようにする
 								ctx.rect(ssize * px[i] + left - (count == 0 ? paddingx : 0), ssize * py[i] + top - fontsize - paddingy + 2, fontsize / 2 + (count == 0 ? paddingx : 0) + (count == plen - 1 ? paddingx - 1 : 0), fontsize + paddingy * 2 - 2);
 								ctx.fill();
 							}
 							count++;
 						}
+						// 死亡していた場合は文字を白色にする
 						if (pdead == true) {
 							ctx.fillStyle = "white";
 						}
+						// 顕現状態の場合は文字を黒色にする
 						else if (phidden[i] == 0) {
 							ctx.fillStyle = "black";
 						}
+						// 隠蔽状態の場合は文字を赤色にする
 						else {
 							ctx.fillStyle = "red";
 						}
+						// キャラクターの番号を描画する
 						ctx.fillText(i, ssize * px[i] + left, ssize * py[i] + top);
+						// 次のキャラクターの番号を描画する位置を計算する
 						left += fontsize / 2;
 					}
 				}
 			}
 		}
 	}
+	// フィールドの下に、ターン数、占領数、残り未占領マスの数を描画する
 	ctx.fillStyle = "black";
 	ctx.font = "20px sans-serif";
 	ctx.fillText("Turn " + turn + "   " + (poccupy[0] + poccupy[1] + poccupy[2]) + " VS " + (poccupy[3] + poccupy[4] + poccupy[5]) + "   left " + poccupy[6], 0, csize + 24);
 
+	// その下に、先手の場合は赤い丸、後手の場合は青い丸を書く
 	if (turn > 0) {
 		if (turn % 2 == 1) {
 			ctx.fillStyle = "red";
@@ -266,33 +373,51 @@ function draw() {
 		}
 		ctx.fillText("●", 0, csize + 48);
 	}
+	// その後に、このターンに行われた行動のメッセージを描画する
 	ctx.fillStyle = "black";
 	ctx.fillText(actionmsg, 22, csize + 48);
 
+	// フィールドの右上に各プレーヤー名を描画する
 	if (gamedata["playerNames"] !== undefined) {
 		ctx.fillStyle = "black";
 		ctx.fillText(gamedata["playerNames"][0], csize + 10, 20);
 		ctx.fillText(gamedata["playerNames"][1], csize + 10, 120);
 	}
 
+	// フィールドの下に、各陣営の占領地数を表すグラフを描画する
+	// フィールドの本拠地の枠を太い枠で描画する
+	// フィールドの右に各キャラクターの情報を描画する
+	// 占領した数を表す文字の描画位置の初期化
 	var tx = 0;
+	// 次に描画する占領数を表す長方形の左の x座標
 	var lx = 0;
+	// 各キャラクター、未占領地の順で描画する
 	for (var i = 0 ; i < 7 ; i++) {
+		// 占領した数に比例する幅の長方形をそのキャラクターの色で描画する
 		ctx.beginPath();
 		ctx.fillStyle = color[i];
 		ctx.rect(lx, csize + 55, poccupy[i] * 2, 25);
-		lx += poccupy[i] * 2;
 		ctx.fill();
+		// 次の長方形の描画位置を計算する
+		lx += poccupy[i] * 2;
+		// 占領数の数を描画する
+		// 未占領地の数は黒で描画する。それ以外はキャラクターの色のまま
 		if (i == 6) {
 			ctx.fillStyle = "black";
 		}
 		ctx.font = "20px sans-serif";
 		ctx.fillText(poccupy[i], tx, csize + 105);
+		// 次の占領数の文字の描画位置を計算する
+		// 10＋占領数の桁数 * 10 ドットだけ、必ず幅を開ける
 		tx += 20 + ((poccupy[i] >= 100) ? 20 : ((poccupy[i] >= 10) ? 10 : 0));
+		// 次の占領数を表す長方形の左端の位置より左であれば、占領数を表す長方形の左の位置に合わせる
 		if (tx < lx) {
 			tx = lx;
 		}
+		// 本拠地の枠を太字で描画する
+		// キャラクターの情報をフィールドの右に描画する（6はキャラクターではない）
 		if (i != 6) {
+			// 本拠地の枠を太字で描画する
 			ctx.strokeStyle = "black";
 			ctx.lineWidth = 1;
 			ctx.beginPath();
@@ -301,17 +426,23 @@ function draw() {
 			ctx.beginPath();
 			ctx.rect(pbx[i] * ssize + 2, pby[i] * ssize + 2, ssize - 4, ssize - 4);
 			ctx.stroke();
+			// キャラクターの情報を描画する
+			// このターンに行動したキャラクターは赤字で描画する
 			if (i == actionplayernum) {
 				ctx.fillStyle = "red";
 			}
 			else {
 				ctx.fillStyle = "black";
 			}
+			// プレーヤーの番号、行動済かどうか、座標、隠蔽状態かどうかの順で描画する
 			ctx.fillText("P" + i + ((pmoved[i] == 0) ? " 　" : " 済") + " (" + px[i] + "," + py[i] + ") " + ((phidden[i] == 1) ? "隠 " : " ") + ((pcure[i] > 0) ? "治" + pcure[i] : ""), csize + 10, 45 + i * 25 + ((i >= 3) ? 25 : 0));
 		}
 	}
+	// 視界に赤か青がチェックされていた場合の処理
 	if (!sikaiallrb.checked) {
+		// チェックされている陣営のキャラクターの最も小さい番号（0：赤、3:青）
 		var start = sikairedrb.checked ? 0 : 3;
+		// 各マスについて、そこがチェックされた陣営の視界内かどうかを調べる
 		for (var x = 0 ; x < fwidth ; x++) {
 			for (var y = 0 ; y < fheight ; y++) {
 				var isvisible = false;
@@ -320,6 +451,7 @@ function draw() {
 						isvisible = true;
 					}
 				}
+				// 視界外の場合は、そのマスを透明度が 50% の黒色で塗りつぶす
 				if (isvisible == false) {
 					ctx.beginPath();
 					ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
@@ -330,13 +462,19 @@ function draw() {
 		}
 	}
 
+	// マウスの位置に関する描画
+	// マウスが存在するフィールドのマスの座標の計算
 	var bx = Math.floor(mx / ssize);
 	var by = Math.floor(my / ssize);
+	// マウスがフィールド内にあった場合
 	if (bx >= 0 && bx < fwidth && by >= 0 && by < fheight) {
+		// マウスのフィールド上の座標をフィールドの右に描画する
 		ctx.fillStyle = "black";
 		ctx.font = "20px sans-serif";
 		ctx.fillText("マウスの位置 (" + bx + ", " + by + ")", csize + 10, 225);
 		ctx.beginPath();
+		// マウスの位置の右下にも描画する
+		// その際に、透明度が 50% の灰色の長方形を描画し、その上に座標を描画する
 		ctx.fillStyle = "rgba(127, 127, 127, 0.5)";
 		ctx.rect(mx, my, 80, 32);
 		ctx.fill();
@@ -345,69 +483,92 @@ function draw() {
 		ctx.fillText("(" + bx + ", " + by + ")", mx + 5, my + 25);
 	}
 
-	// グラフを書く
+	// ここから右下のグラフを描画する
+	// グラフ上の偶数ピリオドの部分を、薄いグリーンで塗りつぶす
 	ctx.fillStyle = "#e0ffe0";
 	ctx.beginPath();
 	for (var p = 1 ; p < 16; p += 2) {
 		ctx.rect(gx + p * 6 * hx, gy - maxy * hy, 6 * hx, maxy * hy);
 		ctx.fill();
 	}
-	var t = -1;
+	
+	// データが読み込まれており、マウスがグラフの上に存在する場合のみ行う処理
 	if (gamedata['title'] !== undefined && mx >= gx && mx <= gx + 96 * hx + 10 && my >= gy - hy * maxy && my <= gy + 20) {
-			t = Math.floor((mx - gx) / hx);
+			// マウスが存在するグラフ上のターン数
+			var t = Math.floor((mx - gx) / hx);
+			// 96 を超えた場合は 96 にする
 			if (t > 96) {
 				t = 96;
 			}
+			// マウスのターン上にライムグリーンの縦棒を描画する
 			ctx.strokeStyle = "limegreen";
 			ctx.lineWidth = 1;
 			ctx.beginPath();
 			ctx.moveTo(gx + t * hx, gy);
 			ctx.lineTo(gx + t * hx, gy - maxy * hy);
 			ctx.stroke();
+			// マウスの右下に、そのターンの情報を描画する
+			// 色とフォントと描画する文字の設定
 			ctx.fillStyle = "black";
 			ctx.font = "16px sans-serif";
 			var txt = "Turn " + t + ": " + occnum[0][t] + " VS " + occnum[1][t];
+			// 1行目に描画する文字の長さを計算する
 			var twidth = ctx.measureText(txt).width;
+			// 描画する文字の x 座標の計算
 			var x = gx + t * hx + 2;
+			// マウスの位置から右に描画した場合、グラフをはみ出る場合、マウスの位置の左に文字を描画するようにする
 			if (t * hx + twidth > hx * 96) {
 				x = gx + t * hx - twidth - 2;
 			}
+			// 1行目の文字を描画する
 			ctx.fillText(txt, x, my - 15);
+			// 時間表示のチェックが ON 担っている場合は、2行目の文字を描画する
+			// 2行目の文字の長さは 1行目より短いので 1行目の位置にあわせて文字を描画する
 			if (restimecb.checked) {
 				txt = "response time = " + restime[t];
 				ctx.fillText(txt, x, my);
 			}
+			// グラフの下にメッセージを描画する
 			ctx.fillText("クリックするとそのターンへ移動します。", gx + 100, gy + 80);
 	}
+	// グラフの x軸を描画する
 	ctx.strokeStyle = "black";
 	ctx.lineWidth = 1;
 	ctx.font = "16px sans-serif";
 	ctx.fillStyle = "black";
-	// 
 	ctx.beginPath();
 	ctx.moveTo(gx, gy);
 	ctx.lineTo(gx + 96 * hx, gy);
 	ctx.stroke();
+	// x軸の目盛りとその下の数字を描画する
 	for (var x = 0 ; x <= 96 ; x++) {
+		// 5ターンおきに描画する
 		if (x % 5 == 0) {
 			ctx.moveTo(gx + x * hx, gy);
 			ctx.lineTo(gx + x * hx, gy - 5);
 			ctx.stroke();
+			// ターン数が1桁の場合と2桁の場合で描画位置を補正する
 			ctx.fillText(x, gx + x * hx - ((x < 10) ? 3 : 7), gy + 16);
 		}
 	}
+	// グラフの y軸を描画する
 	ctx.beginPath();
 	ctx.moveTo(gx, gy);
 	ctx.lineTo(gx, gy - hy * maxy);
 	ctx.stroke();
+	// y軸の目盛りとその左の数字を描画する
 	for (var y = 0 ; y <= maxy ; y++) {
+		// 占領数が 50 おきに描画する
 		if (y % 50 == 0) {
 			ctx.moveTo(gx, gy - y * hy);
 			ctx.lineTo(gx + 5, gy - y * hy);
 			ctx.stroke();
+			// 占領数の桁数に応じて描画位置を補正する
 			ctx.fillText(y, gx - 28 + ((y < 10) ? 16 : (y < 100) ? 8 : 0), gy - y * hy + 6);
 		}
 	}
+	// それぞれの陣営の各ターンの占領数を折れ線グラフで描画する
+	// responsTimeのグラフも必要に応じて描画する
 	for (var i = 0 ; i < 2 ; i++) {
 		ctx.beginPath();
 		ctx.strokeStyle = (i == 0) ? "red" : "blue";
@@ -418,6 +579,7 @@ function draw() {
 			ctx.lineTo(gx + t * hx, gy - hy * occnum[i][t]);
 		}
 		ctx.stroke();
+		// 死亡していた場合はグラフの上に小さな円を描画する
 		for (var t = 0 ; t <= 96 ; t++) {
 			if (kill[t] & (i + 1)) {
 				ctx.beginPath();
@@ -425,6 +587,7 @@ function draw() {
 				ctx.fill();
 			}
 		}
+		// 時間表示が ON 担っていた場合、responseTimeのグラフも描画する
 		if (restimecb.checked) {
 			ctx.beginPath();
 			ctx.strokeStyle = (i == 0) ? "#ffaaaa" : "#aaaaff";
@@ -436,13 +599,16 @@ function draw() {
 			ctx.stroke();
 		}
 	}
+	// ゲームデータが読み込まれていた場合のみ描画する処理
 	if (gamedata['title'] !== undefined) {
+		// 現在のターンの場所に灰色の縦棒を描画する
 		ctx.strokeStyle = "gray";
 		ctx.lineWidth = 1;
 		ctx.beginPath();
 		ctx.moveTo(gx + turn * hx, gy);
 		ctx.lineTo(gx + turn * hx, gy - maxy * hy);
 		ctx.stroke();
+		// グラフの下に説明文を描画する
 		ctx.fillStyle = "black";
 		ctx.fillText("●はそのターンで撃破されたことを表します。", gx + 100, gy + 40);
 		if (restimecb.checked) {
@@ -452,162 +618,247 @@ function draw() {
 			ctx.fillText("下の時間表示を ON にすることで responseTime を表します。", gx + 100, gy + 60);
 		}
 	}	
-
+	// ターンを表すテキストボックスと、スライダーに現在のターンを設定する
 	turntb.value = turn;
 	turnslider.value = turn;
 }
 
+// turn が表すターンの処理を行う。
+// drawflag が true の場合は画面の描画も行う
 function doaction(drawflag) {
+	// 最後のターンを越えていた場合は最後のターンにし、何も行わずに終了する
 	if (turn >= 96) {
 		turn = 96;
 		return;
 	}
+	// ゲームデータが読み込まれていない場合の処理
 	if (gamedata['title'] === undefined) {
+		// メッセージを設定して描画処理を呼んで終了
 		actionmsg = "データがありません。ファイルを上のキャンバスにドラッグアンドドロップしてください。";
 		draw();
 		return;
 	}
+	// このターンに占領した場所の初期化
 	for (var x = 0 ; x < fwidth ; x++) {
 		for (var y = 0 ; y < fheight ; y++) {
 			actionfield[x][y] = 0;
 		}
 	}
 
+	// このターンのゲームのデータ
 	var turndata = gamedata['plays'][turn];
+	// このターンの侍の種類
 	var stype = turndata['samurai'];
+	// このターンの侍の番号
 	var snum = stype + (turn % 2) * 3;
+	// このターンの陣営の侍の番号の最小値
 	var allynum = (turn % 2) * 3;
+	// このターンの陣営でない侍の番号の最小値
 	var enenum = 3 - allynum;
+	// メッセージにこのターンに行動した侍と、responseTime の情報を追加する
 	if (stype >= 0 && stype <= 2) {
 		actionmsg = snum + "(" + typename[stype] + ")の行動 " + turndata['responseTime'] + "ms  ";
 	}
 	else {
+		// 侍の種類が 0 ～ 2 出ない場合は不正であるというメッセージを追加する
 		actionmsg = snum + "(不正なID）の行動 " + turndata['responseTime'] + "ms  ";
 	}
+	// このターンの responseTime を記録する
 	restime[turn + 1] = turndata['responseTime'];
+	// このターンに殺されたかどうかを表す記録を初期化する
 	kill[turn + 1] = 0;
 
+	// このターンに行動したプレーヤーの番号。
+	// 不正な行動や、治療中のキャラクターに対する行動を行った場合はこの変数の中身を -1 にする
 	actionplayernum = snum;
-	// エラーに関係なく行動は出力する
+	// このターンの行動をメッセージに追加する。エラーに関係なく行動は出力する
 	actionmsg += "「 " + ((actionplayernum >= 3) ? actionplayernum - 3 : actionplayernum) + " ";
 	for (var i = 0 ; i < turndata['actions'].length ; i++) {
 		actionmsg += turndata['actions'][i] + " ";
 	}
 	actionmsg += "0 」 ";
+	// タイムアウトになった場合は stype が -1 に設定される。
+	// ただし、意図的に -1 を AI が出力することも可能なので、タイムアウトだと確定することはできない
 	if (stype == -1) {
 		actionmsg += "タイムアウトまたは、不正なID";
 		actionplayernum = -1;
 	}
+	// それ以外で 0 ～ 2 でない場合は不正なID
 	else if (stype < 0 || stype > 2) {
 		actionmsg += "不正なID";
 		actionplayernum = -1;
 	}
+	// 治療中の場合は不正ではないが、このターンに行動が行われることはないので actionplayernum を -1 に設定する
 	else if (pcure[snum] > 0) {
 		actionmsg += "治療中";
 		actionplayernum = -1;
 	}
+	// 既に行動済のキャラクターだった場合もこのターンに行動が行われることはない
 	else if (pmoved[snum] == 1) {
 		actionmsg += "すでに行動しています（不正な行動)";
 		actionplayernum = -1;
 	}
+	// 各キャラクターの治療ターン数を減らす
 	for (var i = 0 ; i < 6 ; i++) {
 		if (pcure[i] > 0) {
 			pcure[i]--;
 		}
-	}
+	}	
+	// 不正な行動または、治療中のキャラクターを指定した行動が行われていた場合など、このターンに行動が行われない場合の処理
 	if (actionplayernum < 0) {
+		// snum が不正ではない場合（治療中のキャラクターを指定した場合）は行動済とする（ルールにそのように明記されている）
 		if (snum >= 0) {
 			pmoved[snum] = 1;
-		}
+		}	
+		// doaction に共通する終了処理を行う関数を呼び、終了する
 		enddoaction(drawflag);
 		return;
 	}
 
+	// 行動を順番に処理する
 	for (var i = 0 ; i < turndata['actions'].length ; i++) {
+		// 行動を表す番号
 		var action = turndata['actions'][i];
+		// 攻撃行動
 		if (action >= 1 && action <= 4) {
+			// メッセージを追加する
 			actionmsg += actiontext[action] + "  ";
+			// 隠蔽状態の場合は攻撃はできないので、エラーのメッセージを表示し、抜ける
 			if (phidden[snum] == 1) {
 				actionmsg += "エラー  ";
 				break;
 			}
+			// 占領可能な場所すべてに対して占領処理を行う
 			for (var j = 0 ; j < attackx[action - 1][stype].length ; j++) {
+				// 占領するマス座標
 				var x = px[snum] + attackx[action - 1][stype][j];
 				var y = py[snum] + attacky[action - 1][stype][j];
+				// フィールド内で、誰かの本拠地でなければ占領される
 				if (x >= 0 && x < fwidth && y >= 0 && y < fheight && fieldb[x][y] == 0) {
+					// 占領数の更新
 					poccupy[field[x][y]]--;
 					poccupy[snum]++;
+					// 占領状態の更新
 					field[x][y] = snum;
+					// このターンにここを占領したことを記録する
 					actionfield[x][y] = 1;
+					// 相手陣営のキャラクターが存在していた場合の処理
 					for (var k = enenum ; k < enenum + 3 ; k++) {
 						if (x == px[k] && y == py[k]) {
+							// 治療ターンを 17 にする（このターンが終了した時に1減るため）
 							pcure[k] = 17;
+							// 本拠地に顕現状態で戻す
 							px[k] = pbx[k];
 							py[k] = pby[k];
 							phidden[k] = 0;
+							// メッセージの追加
 							actionmsg += "P" + k + "撃破  ";
+							// このターンに相手の陣営のキャラクターが死亡したことを記録する
 							kill[turn + 1] |= (enenum == 0) ? 1 : 2;
 						}
 					}
 				}
 			}
 		}
+		// 移動行動
 		else if (action >= 5 && action <= 8) {
+			// メッセージの追加
 			actionmsg += actiontext[action] + "  ";
+			// 移動後の座標の計算
 			var x = px[snum] + attackx[action - 5][0][0];
 			var y = py[snum] + attacky[action - 5][0][0];
+			// フィールド内で、自分以外の本拠地でないかどうかのチェック
 			if (x >= 0 && x < fwidth && y >= 0 && y < fheight && (fieldb[x][y] == 0 || (x == pbx[snum] && y == pby[snum]))) {
+				// 隠蔽状態で、相手陣営が占領している場所の場合は入れないのでエラーとして抜ける
 				if (phidden[snum] == 1 && !(field[x][y] >= allynum && field[x][y] < allynum + 3)) {
 					actionmsg += "エラー  ";
 					break;
 				}
 				else {
+					// エラーかどうかを表すフラグ
 					var error = false;
+					// 移動しようとしたマスに、自分が顕現状態で、自分以外の誰かが顕現状態で存在していれば移動できない
 					for (var j = 0 ; j < 6; j++) {
+						// 自分は飛ばす
 						if (j == snum) {
 							continue;
 						}
+						// 自分が顕現状態で、誰かが顕現状態でいたらエラーのフラグを立てる
 						if (x == px[j] && y == py[j] && phidden[j] == 0 && phidden[snum] == 0) {
 							error = true;
 							break;
 						}
 					}
+					// エラーのフラグが立っていればエラーとして抜ける
 					if (error) {
 							actionmsg += "エラー  ";
 							break;
 					}
+					// エラーでなければ移動する
 					else {
 						px[snum] = x;
 						py[snum] = y;
 					}
 				}
 			}
+			// 移動できないのでエラーとして抜ける
 			else {
 				actionmsg += "エラー  ";
 				break;
 			}
 		}
+		// 隠蔽、顕現の処理
 		else if (action == 9) {
+			// 顕現状態の場合
 			if (phidden[snum] == 0) {
+				// 隠蔽のメッセージの追加
 				actionmsg += actiontext[action] + "  ";
+				// 自分の陣営が占領していれば、隠蔽状態にする
 				if (field[px[snum]][py[snum]] >= allynum && field[px[snum]][py[snum]] < allynum + 3){
 					phidden[snum] = 1;
 				}
+				// そうでなければ隠蔽できないので、エラーにして終了する
 				else {
 					actionmsg += "エラー  ";
 					break;
 				}
 			}
+			// 隠蔽状態の場合
 			else {
+				// 顕現のメッセージの追加
 				actionmsg += actiontext[action + 1] + "  ";
-				phidden[snum] = 0;
+				// エラーかどうかを表すフラグ
+				var error = false;
+				// 顕現しようとしたマスに、自分以外の誰かが顕現状態で存在していれば顕現できない
+				for (var j = 0 ; j < 6; j++) {
+					// 自分は飛ばす
+					if (j == snum) {
+						continue;
+					}
+					// 誰かが顕現状態でいたらエラーのフラグを立てる
+					if (px[snum] == px[j] && py[snum] == py[j] && phidden[j] == 0) {
+						error = true;
+						break;
+					}
+				}
+				// エラーのフラグが立っていればエラーとして抜ける
+				if (error) {
+						actionmsg += "エラー  ";
+						break;
+				}
+				// エラーでなければ顕現状態にする
+				else {
+					phidden[snum] = 0;
+				}
 			}
 		}
 		else {
 			actionmsg += "不明  ";
 		}
 	}
+	// 行動済にする
 	pmoved[snum] = 1;
+	// 計算して得られた占領数が、記録と異なっていれば何かがおかしいので、エラーメッセージを追加する
 	for (var i = 0 ; i < 6 ; i++) {
 		if (poccupy[i] != gamedata['plays'][turn]['territories'][i]) {
 			actionmsg += "占領数エラー  "
@@ -617,89 +868,125 @@ function doaction(drawflag) {
 			break;
 		}
 	}
+	// doaction に共通する終了処理を呼びだす
 	enddoaction(drawflag);
 }
 
+// doaction に共通する終了処理
 function enddoaction(drawflag) {
+	// ターンを進める
 	turn++;
+	// 新しいピリオドになった場合は、全員を未行動にする
 	if (turn % 6 == 0) {
 		for (var i = 0 ; i < 6 ; i++) {
 			pmoved[i] = 0;
 		}
 	}
+	// 各陣営の占領合計数を計算する
 	occnum[0][turn] = poccupy[0] + poccupy[1] + poccupy[2];
 	occnum[1][turn] = poccupy[3] + poccupy[4] + poccupy[5];
+	// drawflag が true の場合は描画を更新する
 	if (drawflag) {
 		draw();
 	}
 }
 
+// ターン t に移行する
 function goturn(t) {
+	// 0 ～ 96 に収まるようにする
 	if (t < 0) {
 		t = 0;
 	}
 	if (t >= 96) {
 		t = 96;
 	}
+	// ゲームを初期化し、最初のターンからターン t まで処理を実行する
 	initgame();
 	for (var i = 0 ; i < t ; i++) {
+		// 処理中に、描画は更新しない
 		doaction(false);
 	}
+	// 描画を更新する
 	draw();
 }
 
+// テキストボックスのターン数が更新された場合の処理
 function changeturntb() {
 	goturn(turntb.value);
 }
 
+// ターン数のスライダーが更新された場合の処理
 function changeturnslider() {
 	goturn(turnslider.value);
 }
 
+// テキストボックスにリプレイデータをコピーして「リプレイ読み込み」をクリックした場合の処理
 function loadreplay() {
+	// テキストボックスの中身を data にコピーする
 	var data = document.getElementById("data").value;
+	// リプレイデータかどうかのチェックその１
 	if (data.indexOf("対戦ログ") == -1) {
 		alert("リプレイのデータではありません");
 	}
 	else {
+		// 先手のAI名を検索する
 		var result = data.match(/AI 0: (.*)\s*AI/);
+		// なければエラー
 		if (result === null) {
 			alert("リプレイのデータではありません");
 			return;
 		}
 		var ai0 = result[1];
+		// 後手のAI名を検索する
 		result = data.match(/AI 1: (.*)\s*対戦/);
+		// なければエラー
 		if (result === null) {
 			alert("リプレイのデータではありません");
 			return;
 		}
 		var ai1 = result[1];
+		// 対戦ログを検索する
 		result = data.match(/対戦ログ\s*(\[\S+\])/);
+		// なければエラー
 		if (result === null) {
 			alert("リプレイのデータではありません");
 			return;
 		}
+		// 対戦データを配列に変換する
 		var plays = JSON.parse(result[1]);
+		// 失敗したらエラー
 		if (plays === null) {
 			alert("リプレイのデータではありません");
 			return;
 		}
+		// gamedata を生成する
+		// ウェブの対戦結果の中にある対戦データの JSON のデータは、
+		// ganeManager が出力するものと若干違うので、合わせる
 		gamedata = {
 			"title":				"",
 			"playerNames":	[	ai0, ai1 ],
 			"plays":				plays
 		};
+		// ゲームを初期化する
 		initgame();
+		// プレーヤーの出力を計算する
 		calcinput();
+		// 最初のターンにする
 		goturn(0);
+		// 描画を更新する
 		draw();
 	}
 }
 
+// プレーヤーの出力を計算する
 function calcinput() {
+	// 先手、後手の出力を表す配列
 	input = [ "", "" ];
+	// 行動付きのバージョン
 	action = [ "", "" ];
+	// ゲームを初期化する
 	initgame();
+	// 各陣営が実際に行った行動を action に記録する
 	for (var turn = 0 ; turn < 96 ; turn++) {
 		var turndata = gamedata['plays'][turn];
 		action[turn % 2] += turndata['samurai'] + " ";
@@ -708,16 +995,22 @@ function calcinput() {
 		}
 		action[turn % 2] += '0\n';
 	}
+	// 各ターンのプレーヤーの出力を計算する
 	for (var turn = 0 ; turn < 96 ; turn++) {
-		goturn(turn);
+		// そのターンに行動した陣営
 		var pl = turn % 2;
+		// プレーヤーへの出力を計算し、記録する
+		// ターンの情報
 		input[pl] += turn + "\n";
+		// そのターンのプレーヤーの陣営のキャラクターの状態
 		for (var i = 0 ; i < 3 ; i++) {
 			var p = pl * 3 + i;
 			input[pl] += px[p] + " " + py[p] + " " + pmoved[p] + " " + phidden[p] + " " + pcure[p] + "\n";
 		}
+		// そのターンの相手プレーヤーの陣営のキャラクターの状態
 		for (var i = 0 ; i < 3 ; i++) {
 			var p = (1 - pl) * 3 + i;
+			// 視界内にいるかどうかをチェックする
 			var isinsight = false;
 			if (phidden[p] == 0) {
 				for (var j = 0 ; j < 3 ; j++) {
@@ -728,40 +1021,52 @@ function calcinput() {
 					}
 				}
 			}
+			// 視界内にいる場合
 			if (isinsight) {
 				input[pl] += px[p] + " " + py[p] + " " + pmoved[p] + " " + phidden[p] + " " + pcure[p] + "\n";
 			}
+			// 視界内にいない場合
 			else {
 				input[pl] += "-1 -1 " + pmoved[p] + " 1 " + pcure[p] + "\n";
 			}
 		}
+		// フィールドの情報
 		for (var y = 0 ; y < fheight ; y++) {
 			for (var x = 0 ; x < fwidth ; x++) {
+				// 視界内かどうかのチェック
 				var isvisible = false;
 				for (var i = pl * 3 ; i < pl * 3 + 3 ; i++) {
 					if (Math.abs(px[i] - x) + Math.abs(py[i] - y) <= 5) {
 						isvisible = true;
 					}
 				}
+				// 本拠地は必ず視界内扱いになっている
 				for (var i = 0 ; i < 6 ; i++) {
 					if (x == pbx[i] && y == pby[i]) {
 						isvisible = true;
 					}
 				}
+				// 視界内の場合
 				if (isvisible) {
 					input[pl] += " " + ((field[x][y] != 6) ? (field[x][y] + pl * 3) % 6 : "8");
 				}
+				// 視界外の場合
 				else {
 					input[pl] += " 9";
 				}
 			}
 			input[pl] += "\n";
 		}
+		// 次のターンへ行く
+		doaction(false);
 	}
+	// 行動付きの出力を計算する（最初に手番の情報を追加する）
 	action[0] = "0\n" + action[0] + input[0];
 	action[1] = "1\n" + action[1] + input[1];
+	// プレーヤーの出力を計算する（最初に手番の情報を追加する）
 	input[0] = "0\n" + input[0];
 	input[1] = "1\n" + input[1];
+	// テキストボックスに結果を出力する
 	document.getElementById("pl0").value = input[0];
 	document.getElementById("pl1").value = input[1];
 	document.getElementById("pl2").value = action[0];
@@ -769,6 +1074,7 @@ function calcinput() {
 	goturn(turn);
 }
 
+// テキストボックス内のプレーヤーの出力をファイルに書き出す
 function saveinput(pl) {
 	if (input.length == 0) {
 		alert("リプレイデータが読み込まれていません。空のファイルを出力します。");
@@ -778,6 +1084,7 @@ function saveinput(pl) {
 	a.href = URL.createObjectURL(blob);
 }
 
+// ゲームのログをファイルに出力する
 function saveinputjson() {
 	if (input.length == 0) {
 		alert("リプレイデータが読み込まれていません。空のファイルを出力します。");
@@ -787,13 +1094,18 @@ function saveinputjson() {
 	a.href = URL.createObjectURL(blob);
 }
 
+// マウスが移動した時のイベントハンドラ
 function mousemove(evt) {
+	// マウスの座標を記録する
 	mx = evt.clientX - canvas.getBoundingClientRect().left;
 	my = evt.clientY - canvas.getBoundingClientRect().top;
+	// 描画処理を行う
 	draw();
 }
 
+// キャンバス上をクリックした時のイベントハンドラ
 function canvasclick() {
+	// ゲームが読み込まれており、右下のグラフをクリックした場合は、そのターン数へ移動する
 	if (gamedata['title'] !== undefined && mx >= gx && mx <= gx + 96 * hx + 10 && my >= gy - hy * maxy && my <= gy + 20) {
 		var t = Math.floor((mx - gx) / hx);
 		if (t > 96) {
@@ -803,9 +1115,12 @@ function canvasclick() {
 	}
 }
 
+// 次に誰かが死んだターンへ移動（prevflag が true の場合は前）
 function nextkill(prevflag) {
+	// ゲームが読み込まれていた場合
 	if (gamedata['title'] !== undefined) {
 		if (!prevflag) {
+			// 今のターンから探す
 			for (var t = turn + 1 ; t <= 96 ; t++) {
 				if (kill[t]) {
 					goturn(t);
@@ -814,6 +1129,7 @@ function nextkill(prevflag) {
 			}
 		}
 		else {
+			// 今のターンからさかのぼって探す
 			for (var t = turn - 1 ; t > 0 ; t--) {
 				if (kill[t]) {
 					goturn(t);
@@ -824,8 +1140,11 @@ function nextkill(prevflag) {
 	}
 }
 
+// キー入力イベントハンドラ
 function keydown(evt) {
+	// →キー
 	if (evt.keyCode == 39) {
+		// シフトキーが押されていない場合
 		if (!evt.shiftKey) {
 			doaction(true);
 		}
@@ -833,6 +1152,7 @@ function keydown(evt) {
 			nextkill(false);
 		}
 	}
+	// ←キー
 	else if (evt.keyCode == 37) {
 		if (!evt.shiftKey) {
 			goturn(turn - 1);
@@ -841,19 +1161,26 @@ function keydown(evt) {
 			nextkill(true);
 		}
 	}
+	// ↑キー
 	else if (evt.keyCode == 38) {
 		goturn(0);
 	}
+	// ↓キー
 	else if (evt.keyCode == 40) {
 		goturn(96);
 	}
 }
 
+// マウスのホイールに対するイベントハンドラ
 function mousewheel(evt) {
+	// 手前に転がしたとき
 	if (evt.deltaY > 0) {
+		// 次のターンへ
 		doaction(true);
 	}
+	// 奥に転がしたとき
 	else {
+		// 前のターンへ
 		goturn(turn - 1);
 	}
 }
@@ -862,7 +1189,7 @@ function mousewheel(evt) {
 
 </head>
 <body id="body" onload="PageLoad();">
-	Samurai visualizer ver 5.2 (last update 2017/1/26)<br>
+	Samurai visualizer ver 5.3 (last update 2017/2/9)<br>
 	<canvas id="canvas" width="1200" height="710" onmousemove="mousemove(event);" onclick="canvasclick();"></canvas><br>
 	<input type="button" value="最初(↑)" onClick="goturn(0);">
 	<input type="button" value="前(←,wheel+)" onClick="goturn(turn - 1);">
