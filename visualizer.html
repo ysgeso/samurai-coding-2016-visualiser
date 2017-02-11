@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-<title>Samurai Visualizer ver 5.3</title>
+<title>Samurai Visualizer ver 5.4</title>
 <style>
 body {
 	line-height: 1.2;
@@ -924,8 +924,13 @@ function changeturnslider() {
 function loadreplay() {
 	// テキストボックスの中身を data にコピーする
 	var data = document.getElementById("data").value;
+	// 英語版のページかどうか
+	var english = false;
+	if (data.indexOf("Battle Log") != -1) {
+		english = true;
+	}
 	// リプレイデータかどうかのチェックその１
-	if (data.indexOf("対戦ログ") == -1) {
+	if (data.indexOf("対戦ログ") == -1 && english == false) {
 		alert("リプレイのデータではありません");
 	}
 	else {
@@ -938,7 +943,12 @@ function loadreplay() {
 		}
 		var ai0 = result[1];
 		// 後手のAI名を検索する
-		result = data.match(/AI 1: (.*)\s*対戦/);
+		if (english == false) {
+			result = data.match(/AI 1: (.*)\s*対戦/);
+		}
+		else {
+			result = data.match(/AI 1: (.*)\s*Battle/);
+		}
 		// なければエラー
 		if (result === null) {
 			alert("リプレイのデータではありません");
@@ -946,7 +956,12 @@ function loadreplay() {
 		}
 		var ai1 = result[1];
 		// 対戦ログを検索する
-		result = data.match(/対戦ログ\s*(\[\S+\])/);
+		if (english == false) {
+			result = data.match(/対戦ログ\s*(\[\S+\])/);
+		}
+		else {
+			result = data.match(/Battle Log\s*(\[\S+\])/);
+		}
 		// なければエラー
 		if (result === null) {
 			alert("リプレイのデータではありません");
@@ -1189,7 +1204,7 @@ function mousewheel(evt) {
 
 </head>
 <body id="body" onload="PageLoad();">
-	Samurai visualizer ver 5.3 (last update 2017/2/9)<br>
+	Samurai visualizer ver 5.4 (last update 2017/2/11)<br>
 	<canvas id="canvas" width="1200" height="710" onmousemove="mousemove(event);" onclick="canvasclick();"></canvas><br>
 	<input type="button" value="最初(↑)" onClick="goturn(0);">
 	<input type="button" value="前(←,wheel+)" onClick="goturn(turn - 1);">
