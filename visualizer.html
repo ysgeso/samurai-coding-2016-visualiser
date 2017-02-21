@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-<title>Samurai Visualizer ver 5.4</title>
+<title>Samurai Visualizer ver 6.0</title>
 <style>
 body {
 	line-height: 1.2;
@@ -682,6 +682,7 @@ function doaction(drawflag) {
 	if (stype == -1) {
 		actionmsg += "タイムアウトまたは、不正なID";
 		actionplayernum = -1;
+		snum = -1;
 	}
 	// それ以外で 0 ～ 2 でない場合は不正なID
 	else if (stype < 0 || stype > 2) {
@@ -956,19 +957,15 @@ function loadreplay() {
 		}
 		var ai1 = result[1];
 		// 対戦ログを検索する
-		if (english == false) {
-			result = data.match(/対戦ログ\s*(\[\S+\])/);
-		}
-		else {
-			result = data.match(/Battle Log\s*(\[\S+\])/);
-		}
+		result = data.match(/{\"replay\"=>\[(.+\]\})\]\}/);
+		result[1] = result[1].replace(/=>/g, ":");
 		// なければエラー
 		if (result === null) {
 			alert("リプレイのデータではありません");
 			return;
 		}
 		// 対戦データを配列に変換する
-		var plays = JSON.parse(result[1]);
+		var plays = JSON.parse("[" + result[1] + "]");
 		// 失敗したらエラー
 		if (plays === null) {
 			alert("リプレイのデータではありません");
@@ -1204,7 +1201,7 @@ function mousewheel(evt) {
 
 </head>
 <body id="body" onload="PageLoad();">
-	Samurai visualizer ver 5.4 (last update 2017/2/11)<br>
+	Samurai visualizer ver 6.0 (last update 2017/2/21)<br>
 	<canvas id="canvas" width="1200" height="710" onmousemove="mousemove(event);" onclick="canvasclick();"></canvas><br>
 	<input type="button" value="最初(↑)" onClick="goturn(0);">
 	<input type="button" value="前(←,wheel+)" onClick="goturn(turn - 1);">
