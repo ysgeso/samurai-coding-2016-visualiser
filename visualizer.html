@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-<title>Samurai Visualizer ver 6.0</title>
+<title>Samurai Visualizer ver 6.1</title>
 <style>
 body {
 	line-height: 1.2;
@@ -708,25 +708,35 @@ function doaction(drawflag) {
 	// 不正な行動または、治療中のキャラクターを指定した行動が行われていた場合など、このターンに行動が行われない場合の処理
 	if (actionplayernum < 0) {
 		// snum が不正ではない場合（治療中のキャラクターを指定した場合）は行動済とする（ルールにそのように明記されている）
-		if (snum >= 0) {
-			pmoved[snum] = 1;
-		}	
+		// そうじゃなくなったみたいなのでここはコメントにしておく
+		//if (snum >= 0) {
+		//	pmoved[snum] = 1;
+		//}
 		// doaction に共通する終了処理を行う関数を呼び、終了する
 		enddoaction(drawflag);
 		return;
 	}
 
+	// 行動コスト
+	var cost = 0;
 	// 行動を順番に処理する
 	for (var i = 0 ; i < turndata['actions'].length ; i++) {
 		// 行動を表す番号
 		var action = turndata['actions'][i];
 		// 攻撃行動
 		if (action >= 1 && action <= 4) {
+			// 行動コストを加算する
+			cost += 4;
 			// メッセージを追加する
 			actionmsg += actiontext[action] + "  ";
 			// 隠蔽状態の場合は攻撃はできないので、エラーのメッセージを表示し、抜ける
 			if (phidden[snum] == 1) {
 				actionmsg += "エラー  ";
+				break;
+			}
+			// 行動コストが制限を超えていたらエラーメッセージを表示し、抜ける
+			if (cost > 7) {
+				actionmsg += "エラー（コストオーバー）  ";
 				break;
 			}
 			// 占領可能な場所すべてに対して占領処理を行う
@@ -763,8 +773,14 @@ function doaction(drawflag) {
 		}
 		// 移動行動
 		else if (action >= 5 && action <= 8) {
+			cost += 2;
 			// メッセージの追加
 			actionmsg += actiontext[action] + "  ";
+			// 行動コストが制限を超えていたらエラーメッセージを表示し、抜ける
+			if (cost > 7) {
+				actionmsg += "エラー（コストオーバー）  ";
+				break;
+			}
 			// 移動後の座標の計算
 			var x = px[snum] + attackx[action - 5][0][0];
 			var y = py[snum] + attacky[action - 5][0][0];
@@ -810,6 +826,12 @@ function doaction(drawflag) {
 		}
 		// 隠蔽、顕現の処理
 		else if (action == 9) {
+			cost += 1;
+			// 行動コストが制限を超えていたらエラーメッセージを表示し、抜ける
+			if (cost > 7) {
+				actionmsg += "エラー（コストオーバー）  ";
+				break;
+			}
 			// 顕現状態の場合
 			if (phidden[snum] == 0) {
 				// 隠蔽のメッセージの追加
@@ -1201,7 +1223,6 @@ function mousewheel(evt) {
 
 </head>
 <body id="body" onload="PageLoad();">
-	Samurai visualizer ver 6.0 (last update 2017/2/21)<br>
 	<canvas id="canvas" width="1200" height="710" onmousemove="mousemove(event);" onclick="canvasclick();"></canvas><br>
 	<input type="button" value="最初(↑)" onClick="goturn(0);">
 	<input type="button" value="前(←,wheel+)" onClick="goturn(turn - 1);">
