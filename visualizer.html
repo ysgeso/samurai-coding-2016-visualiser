@@ -2,14 +2,16 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-<title>Samurai Visualizer ver 6.1</title>
+<title>Samurai Visualizer ver 7.0</title>
 <style>
 body {
 	line-height: 1.2;
 }
 </style>
 <script>
-// 読み込んだゲームデータ
+// 読み込んだゲームデータのリスト
+var gamedatalist = [];
+// 現在表示中のゲームデータ
 var gamedata = {};
 // キャンバスのコンテキスト
 var ctx;
@@ -95,6 +97,8 @@ function handleFileSelect(evt) {
 	// ドロップしたファイルの数だけ繰り返す
 	for (var i = 0; i < files.length; i++) {
 		var reader = new FileReader();
+		// ファイル名を入れておく
+		reader.fname = files[i].name;
 		// ファイルの読み込みが完了した時に実行される
 		reader.onload = (function(f) {
 			// JSON 形式のデータを配列にする
@@ -105,10 +109,14 @@ function handleFileSelect(evt) {
 				gamedata['title'] = "";
 				gamedata['playerNames'] = [ "pl1", "pl2" ];
 			}
+			// ファイル名を設定する
+			gamedata['fname'] = this.fname;
 			// ゲームデータの初期化
 			initgame();
 			// データの中身を計算する
 			calcinput();
+			// セレクターを更新する
+			updateselector();
 			// 0 ターン目に移動
 			goturn(0);
 			draw();
@@ -141,6 +149,7 @@ function PageLoad(evt) {
 	sikairedrb = document.getElementById('sikaired');
 	sikaibluerb = document.getElementById('sikaiblue');
 	restimecb = document.getElementById('restime');
+	gameselector = document.getElementById("gameselector");
 
 	// キー入力、マウスホイールのイベントハンドラを設定
 	document.onkeydown = keydown;
@@ -1001,6 +1010,9 @@ function loadreplay() {
 			"playerNames":	[	ai0, ai1 ],
 			"plays":				plays
 		};
+		// ゲームデータリストに追加し、セレクターを更新する
+		gamedatalist.push(gamedata);
+		updateselector();
 		// ゲームを初期化する
 		initgame();
 		// プレーヤーの出力を計算する
@@ -1203,6 +1215,20 @@ function keydown(evt) {
 	else if (evt.keyCode == 40) {
 		goturn(96);
 	}
+	// ＋キー
+	else if (evt.keyCode == 107) {
+		if (gameselector.selectedIndex < gamedatalist.length - 1) {
+			gameselector.selectedIndex++;
+			selectorchange();
+		}
+	}
+	// －キー
+	else if (evt.keyCode == 109) {
+		if (gameselector.selectedIndex > 0) {
+			gameselector.selectedIndex--;
+			selectorchange();
+		}
+	}
 }
 
 // マウスのホイールに対するイベントハンドラ
@@ -1219,11 +1245,62 @@ function mousewheel(evt) {
 	}
 }
 
+// gamedatalist からセレクターを更新する
+function updateselector() {
+	var num = gamedatalist.length;
+	// ゲームデータのリストが空の場合は初期セレクタを削除する
+	if (num == 0) {
+		gameselector.remove(0);
+	}
+	gamedatalist.push(gamedata);
+	var gdata = gamedatalist[num];
+	// セレクタに表示するメッセージの生成
+	var winmsg = (occnum[0][96] == occnum[1][96]) ? "引き分け" : (occnum[0][96] > occnum[1][96]) ? "先手勝利" : "後手勝利";
+	var msg = gdata.playerNames[0] + " VS " + gdata.playerNames[1] + " (" + occnum[0][96] + " VS " + occnum[1][96] + ") " + winmsg;
+	gamedata.msg = msg;
+	gameselector.add(new Option(num + ": " + msg, num));
+	gameselector.value = num;
+}
+
+// セレクタが変更された時の処理
+function selectorchange() {
+	if (gamedatalist.length > gameselector.selectedIndex) {
+		gamedata = gamedatalist[gameselector.selectedIndex];
+		// ゲームを初期化する
+		initgame();
+		// プレーヤーの出力を計算する
+		calcinput();
+		// 最初のターンにする
+		goturn(0);
+		// 描画を更新する
+		draw();
+	}
+}
+
+function sortgamelist() {
+	if (gamedatalist.length > 0) {
+		gamedatalist.sort(function(a, b) { return a.fname > b.fname ? 1 : -1; });
+		for (var i = 0 ; i < gamedatalist.length ; i++) {
+			gameselector[i].text = i + ": " + gamedatalist[i].msg;
+		}
+		// 最初のセレクタのゲームを選択する
+		gameselector.value = 0;
+		gamedata = gamedatalist[0];
+		// ゲームデータの初期化
+		initgame();
+		// データの中身を計算する
+		calcinput();
+		// 0 ターン目に移動
+		goturn(0);
+		draw();
+	}
+}
+
 </script>
 
 </head>
 <body id="body" onload="PageLoad();">
-	Samurai visualizer ver 6.1 (last update 2017/3/2)<br>
+	Samurai visualizer ver 7.0 (last update 2017/6/19) <select id="gameselector" onchange="selectorchange()"><option value="-1">ゲームデータが読み込まれていません</option></select> (テンキーの＋，－キーで操作可能) <input type="button" value="ファイル名でソート" onclick="sortgamelist();"><br>
 	<canvas id="canvas" width="1200" height="710" onmousemove="mousemove(event);" onclick="canvasclick();"></canvas><br>
 	<input type="button" value="最初(↑)" onClick="goturn(0);">
 	<input type="button" value="前(←,wheel+)" onClick="goturn(turn - 1);">
